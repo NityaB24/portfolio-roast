@@ -103,8 +103,8 @@ body {
   width: 24px;
   height: 24px;
   border-radius: 999px;
+  /* Inherits the severity colour from .hotspot; the inner span flips to ink. */
   background: currentColor;
-  color: var(--color-ink);
   font-family: var(--font-mono);
   font-weight: 700;
   font-size: 12px;
@@ -116,7 +116,7 @@ body {
 }
 
 .strike {
-  background-image: linear-gradient(transparent 55%, var(--color-blood) 55%, var(--color-blood) 78%, transparent 78%);
+  background-image: linear-gradient(transparent 44%, var(--color-blood) 44%, var(--color-blood) 64%, transparent 64%);
 }
 
 input::placeholder {

@@ -45,7 +45,7 @@ export function ogHtml(rec: RoastRecord): string {
   .score { display: flex; align-items: baseline; gap: 28px; }
   .num { font-size: 300px; line-height: .85; font-weight: 900; letter-spacing: -0.06em; color: ${tone.accent}; font-variant-numeric: tabular-nums; }
   .outof { font-size: 44px; font-weight: 700; color: #6F6B63; }
-  .label { font-size: 30px; font-weight: 800; letter-spacing: .22em; color: #0B0B0C; background: ${tone.accent}; padding: 8px 18px; border-radius: 6px; align-self: flex-start; margin-bottom: 18px; }
+  .label { display: inline-block; font-size: 30px; font-weight: 800; letter-spacing: .22em; color: #0B0B0C; background: ${tone.accent}; padding: 8px 18px; border-radius: 6px; margin-bottom: 18px; }
   .verdict { font-size: 44px; line-height: 1.12; font-weight: 700; letter-spacing: -0.02em; max-width: 1000px; }
   .foot { display: flex; justify-content: space-between; align-items: flex-end; font-size: 24px; color: #6F6B63; }
   .brand { font-weight: 900; letter-spacing: -0.03em; color: #F4F1EA; font-size: 30px; }
@@ -55,7 +55,7 @@ export function ogHtml(rec: RoastRecord): string {
   <div class="grain"></div>
   <div class="bar"></div>
   <div class="wrap">
-    <div class="top"><img src="${esc(favicon)}" alt=""><span>${esc(domain)}</span></div>
+    <div class="top"><img src="${esc(favicon)}" alt="" onerror="this.style.display='none'"><span>${esc(domain)}</span></div>
     <div>
       <div class="score"><div class="num">${rec.score}</div><div class="outof">/100</div></div>
     </div>

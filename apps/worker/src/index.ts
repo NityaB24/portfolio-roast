@@ -13,7 +13,8 @@ import type { RoastRecord } from "./lib/schema";
 import { GUARD_MESSAGES, guardUrl } from "./lib/url-guard";
 import { ogHtml } from "./og";
 
-export const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+/** Roasts younger than this are served from D1 instead of re-rendered. Not exported: a Worker entry module may only export handlers. */
+const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 const SHOT_CACHE = "public, max-age=31536000, immutable";
 
 type AppEnv = { Bindings: Env };

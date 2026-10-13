@@ -80,6 +80,10 @@ describe("guardUrl (SSRF)", () => {
     ["javascript:alert(1)", "scheme"],
     ["gopher://example.com", "scheme"],
     ["http://user:pass@example.com", "credentials"],
+    ["https://admin:hunter2@example.com/", "credentials"],
+    ["mailto:someone@example.com", "scheme"],
+    ["http://nope.example", "internal_tld"],
+    ["http://router", "localhost"],
     ["http://example.com:22", "port"],
     ["http://example.com:6379", "port"],
     ["", "empty"],
@@ -91,7 +95,7 @@ describe("guardUrl (SSRF)", () => {
     if (!r.ok) expect(r.reason).toBe(reason);
   });
 
-  const allowed = ["https://example.com", "example.com", "http://example.com:8080/x", "https://sub.domain.example.io/portfolio?x=1", "https://8.8.8.8", "https://[2606:4700:4700::1111]", "https://xn--bcher-kva.example"];
+  const allowed = ["https://example.com", "example.com", "http://example.com:8080/x", "https://sub.domain.example.io/portfolio?x=1", "https://8.8.8.8", "https://[2606:4700:4700::1111]", "https://xn--bcher-kva.de", "HTTPS://Example.COM:443/#hero", "localhost.example.com"];
   it.each(allowed)("allows %s", (url) => {
     const r = guardUrl(url);
     expect(r.ok).toBe(true);
@@ -100,5 +104,14 @@ describe("guardUrl (SSRF)", () => {
   it("returns the normalized url", () => {
     const r = guardUrl("Example.COM/#hero");
     expect(r.ok && r.url).toBe("https://example.com");
+    const q = guardUrl("example.com:3000/work/?a=1#top");
+    expect(q.ok && q.url).toBe("https://example.com:3000/work?a=1");
+  });
+
+  it("treats host:port input as a host, not a scheme", () => {
+    expect(normalizeUrl("example.com:8080/x")).toBe("https://example.com:8080/x");
+    const r = guardUrl("localhost:3000");
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.reason).toBe("localhost");
   });
 });

@@ -24,26 +24,35 @@ export type GuardReason =
 const BLOCKED_TLDS = new Set(["local", "internal", "localhost", "localdomain", "home", "lan", "intranet", "corp", "test", "example", "invalid", "onion"]);
 const ALLOWED_PORTS = new Set(["", "80", "443", "8080", "8443", "3000"]);
 
-/** Normalize a user-supplied URL: add https, lowercase host, strip hash. */
-export function normalizeUrl(raw: string): string | null {
+/**
+ * Parse user input into a URL, adding `https://` when no scheme is present.
+ * "letters:" counts as a scheme only when it is not followed by a digit, so
+ * `example.com:3000` is treated as host:port while `javascript:alert(1)` and
+ * `mailto:x` keep their (rejected) scheme.
+ */
+export function parseInput(raw: string): URL | null {
   let input = raw.trim();
   if (!input) return null;
-  if (!/^[a-z][a-z0-9+.-]*:\/\//i.test(input)) {
-    // "example.com/foo" -> "https://example.com/foo"
-    input = `https://${input}`;
-  }
-  let u: URL;
+  const hasScheme = /^[a-z][a-z0-9+.-]*:(?!\d)/i.test(input);
+  if (!hasScheme) input = `https://${input}`;
   try {
-    u = new URL(input);
+    return new URL(input);
   } catch {
     return null;
   }
+}
+
+/** Canonical form of an already-parsed URL: no hash, no credentials, lowercase host, no default port, no trailing slash. */
+export function normalizeParsed(input: URL): string {
+  const u = new URL(input.toString());
   u.hash = "";
+  u.username = "";
+  u.password = "";
   u.hostname = u.hostname.toLowerCase().replace(/\.+$/, "");
-  // Drop default ports explicitly written out.
   if ((u.protocol === "https:" && u.port === "443") || (u.protocol === "http:" && u.port === "80")) {
     u.port = "";
   }
+  if (u.protocol !== "http:" && u.protocol !== "https:") return u.toString();
   // Collapse trailing slash on bare origins so https://a.com and https://a.com/ match.
   if (u.pathname === "/" && !u.search) {
     return u.origin;
@@ -52,6 +61,12 @@ export function normalizeUrl(raw: string): string | null {
     u.pathname = u.pathname.replace(/\/+$/, "");
   }
   return u.toString();
+}
+
+/** Normalize a user-supplied URL: add https, lowercase host, strip hash. Null when unparseable. */
+export function normalizeUrl(raw: string): string | null {
+  const u = parseInput(raw);
+  return u ? normalizeParsed(u) : null;
 }
 
 export function parseIPv4(host: string): [number, number, number, number] | null {
@@ -140,30 +155,33 @@ export function isBlockedHostname(host: string): GuardReason | null {
   const h = host.toLowerCase().replace(/\.+$/, "");
   if (h === "localhost" || h.endsWith(".localhost")) return "localhost";
   if (h === "0" || h === "0.0.0.0") return "private_ip";
-  const labels = h.split(".");
-  const tld = labels[labels.length - 1] ?? "";
-  if (BLOCKED_TLDS.has(tld)) return "internal_tld";
-  // Single-label hostnames (e.g. "intranet", "router") never resolve publicly.
-  if (labels.length < 2) return "localhost";
-  // Decimal / hex / octal IPv4 disguises: "2130706433", "0x7f000001", "017700000001"
+  // Decimal / hex / octal IPv4 disguises: "2130706433", "0x7f000001", "017700000001".
+  // WHATWG URL already folds most of these into dotted form; this is belt and braces.
   if (/^(0x[0-9a-f]+|\d+)$/i.test(h)) return "private_ip";
   if (/^\d+(\.\d+){1,3}$/.test(h) && !parseIPv4(h)) return "private_ip";
+  const labels = h.split(".");
+  // Single-label hostnames (e.g. "intranet", "router") never resolve publicly.
+  if (labels.length < 2) return "localhost";
+  const tld = labels[labels.length - 1] ?? "";
+  if (BLOCKED_TLDS.has(tld)) return "internal_tld";
   return null;
 }
 
 /**
  * Validate a raw URL. Returns the normalized URL if it is safe to fetch.
+ * Checks run on the parsed input (before normalization strips credentials).
  */
 export function guardUrl(raw: string): GuardResult {
   if (!raw || !raw.trim()) return { ok: false, reason: "empty" };
-  const normalized = normalizeUrl(raw);
-  if (!normalized) return { ok: false, reason: "invalid" };
-  const u = new URL(normalized);
+  const u = parseInput(raw);
+  if (!u) return { ok: false, reason: "invalid" };
   if (u.protocol !== "http:" && u.protocol !== "https:") return { ok: false, reason: "scheme" };
   if (u.username || u.password) return { ok: false, reason: "credentials" };
   if (!ALLOWED_PORTS.has(u.port)) return { ok: false, reason: "port" };
 
-  const host = u.hostname;
+  const host = u.hostname.toLowerCase();
+  if (!host) return { ok: false, reason: "invalid" };
+  const normalized = normalizeParsed(u);
   if (host.startsWith("[") && host.endsWith("]")) {
     const v6 = host.slice(1, -1);
     if (!expandIPv6(v6)) return { ok: false, reason: "invalid" };
@@ -176,7 +194,7 @@ export function guardUrl(raw: string): GuardResult {
   }
   const blocked = isBlockedHostname(host);
   if (blocked) return { ok: false, reason: blocked };
-  if (!/^[a-z0-9.-]+$/i.test(host) && !/^xn--/.test(host)) {
+  if (!/^[a-z0-9.-]+$/i.test(host)) {
     // URL already punycodes IDNs; anything else left is malformed.
     return { ok: false, reason: "invalid" };
   }

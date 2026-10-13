@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildOgTags, injectOg } from "./[id]";
+import { buildOgTags, injectOg } from "../functions/r/[id]";
 
 describe("Pages Function OG injection", () => {
   const rec = { id: "abc123DEF456", score: 58, verdict: 'A "fine" portfolio <3', normalizedUrl: "https://www.jane.example", blocked: false };

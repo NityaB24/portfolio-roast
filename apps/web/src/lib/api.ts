@@ -52,6 +52,8 @@ export interface RoastRecord {
   optInLeaderboard: boolean;
   cached?: boolean;
   blockedReason?: string;
+  /** Secret returned once, only to the creator of a fresh roast. Needed to remove it later. */
+  removeToken?: string;
 }
 
 export interface Quota {
@@ -122,7 +124,12 @@ export const api = {
   top: (period: "week" | "all") => request<{ entries: LeaderboardEntry[] }>(`/api/top?period=${period}`),
   bottom: () => request<{ entries: LeaderboardEntry[] }>("/api/bottom"),
   history: (url: string) => request<{ entries: HistoryEntry[] }>(`/api/history?url=${encodeURIComponent(url)}`),
-  remove: (id: string) => request<{ ok: boolean }>(`/api/remove/${encodeURIComponent(id)}`, { method: "POST" }),
+  remove: (id: string, token: string) =>
+    request<{ ok: boolean }>(`/api/remove/${encodeURIComponent(id)}`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ token }),
+    }),
   shotUrl: (id: string, viewport: Viewport) => `${API_BASE}/api/shots/${id}/${viewport}.webp`,
   ogUrl: (id: string) => `${API_BASE}/og/${id}.png`,
 };
@@ -144,4 +151,32 @@ export function scoreTone(score: number, blocked = false): { color: string; labe
   if (score >= 70) return { color: "text-sev-med", label: "Solid" };
   if (score >= 50) return { color: "text-[#ff8a3d]", label: "Mid" };
   return { color: "text-blood", label: "Roasted" };
+}
+
+const TOKEN_PREFIX = "roast-remove:";
+
+/** Keep the removal token in this browser only; it is never sent anywhere except the remove call. */
+export function saveRemoveToken(rec: Pick<RoastRecord, "id" | "removeToken">): void {
+  if (!rec.removeToken) return;
+  try {
+    window.localStorage.setItem(TOKEN_PREFIX + rec.id, rec.removeToken);
+  } catch {
+    // private mode: the creator just loses the remove button
+  }
+}
+
+export function loadRemoveToken(id: string): string | null {
+  try {
+    return window.localStorage.getItem(TOKEN_PREFIX + id);
+  } catch {
+    return null;
+  }
+}
+
+export function forgetRemoveToken(id: string): void {
+  try {
+    window.localStorage.removeItem(TOKEN_PREFIX + id);
+  } catch {
+    // ignore
+  }
 }

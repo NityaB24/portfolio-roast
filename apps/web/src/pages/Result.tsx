@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import Hotspots from "../components/Hotspots";
 import ScoreCountUp from "../components/ScoreCountUp";
-import { api, ApiError, domainOf, MODE_LABEL, scoreTone, SEVERITY_CLASS, SEVERITY_LABEL, type HistoryEntry, type RoastRecord, type Viewport } from "../lib/api";
+import { api, ApiError, domainOf, forgetRemoveToken, loadRemoveToken, MODE_LABEL, saveRemoveToken, scoreTone, SEVERITY_CLASS, SEVERITY_LABEL, type HistoryEntry, type RoastRecord, type Viewport } from "../lib/api";
 import { formatCountdown, linkedInShareUrl, msUntilReroast, shareText, xShareUrl } from "../lib/share";
 
 export default function Result() {
@@ -89,6 +89,7 @@ export default function Result() {
   }
 
   const domain = domainOf(rec.normalizedUrl);
+  const removeToken = loadRemoveToken(rec.id);
   const tone = scoreTone(rec.score, rec.blocked);
   const cooldown = msUntilReroast(rec.createdAt, now);
   const canReroast = cooldown === 0;
@@ -108,6 +109,7 @@ export default function Result() {
     setReroasting(true);
     try {
       const fresh = await api.roast(rec!.normalizedUrl, rec!.mode);
+      saveRemoveToken(fresh);
       navigate(`/r/${fresh.id}`, { state: { record: fresh } });
       setRec(fresh);
       setActive(null);
@@ -119,10 +121,12 @@ export default function Result() {
   }
 
   async function remove() {
+    if (!removeToken) return;
     if (!window.confirm("Remove this result from the leaderboard and hide this page? This cannot be undone.")) return;
     setRemoving(true);
     try {
-      await api.remove(rec!.id);
+      await api.remove(rec!.id, removeToken!);
+      forgetRemoveToken(rec!.id);
       navigate("/");
     } catch (e) {
       alert(e instanceof Error ? e.message : "Removal failed.");
@@ -167,9 +171,11 @@ export default function Result() {
             <Btn onClick={reroast} disabled={!canReroast || reroasting} title={canReroast ? "Roast this URL again" : "Available 24h after the last roast"}>
               {reroasting ? "Roasting…" : canReroast ? "Re-roast" : `Re-roast in ${formatCountdown(cooldown)}`}
             </Btn>
-            <Btn onClick={remove} disabled={removing} danger>
-              Remove my result
-            </Btn>
+            {removeToken && (
+              <Btn onClick={remove} disabled={removing} danger>
+                Remove my result
+              </Btn>
+            )}
           </div>
         </div>
       </header>

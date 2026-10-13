@@ -56,11 +56,11 @@ export async function getFreshByUrl(db: D1Database, normalizedUrl: string, mode:
   return row ? rowToRecord(row) : null;
 }
 
-export async function insert(db: D1Database, rec: RoastRecord): Promise<void> {
+export async function insert(db: D1Database, rec: RoastRecord, removeTokenHash: string | null = null): Promise<void> {
   await db
     .prepare(
-      `INSERT INTO roasts (id, url, normalizedUrl, score, verdict, roastsJson, complimentsJson, signalsJson, promptVersion, blocked, createdAt, optInLeaderboard, mode)
-       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)`,
+      `INSERT INTO roasts (id, url, normalizedUrl, score, verdict, roastsJson, complimentsJson, signalsJson, promptVersion, blocked, createdAt, optInLeaderboard, mode, removeTokenHash)
+       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)`,
     )
     .bind(
       rec.id,
@@ -76,6 +76,7 @@ export async function insert(db: D1Database, rec: RoastRecord): Promise<void> {
       rec.createdAt,
       rec.optInLeaderboard ? 1 : 0,
       rec.mode,
+      removeTokenHash,
     )
     .run();
 }
@@ -136,7 +137,11 @@ export async function history(db: D1Database, normalizedUrl: string): Promise<Ar
   return results.map((r) => ({ ...r, mode: RoastModeSchema.catch("brutal").parse(r.mode ?? undefined) }));
 }
 
-export async function optOut(db: D1Database, id: string): Promise<boolean> {
-  const res = await db.prepare("UPDATE roasts SET optInLeaderboard = 0 WHERE id = ?1").bind(id).run();
+/** Hide a roast. Succeeds only when `tokenHash` matches the hash stored at creation. */
+export async function optOut(db: D1Database, id: string, tokenHash: string): Promise<boolean> {
+  const res = await db
+    .prepare("UPDATE roasts SET optInLeaderboard = 0 WHERE id = ?1 AND removeTokenHash IS NOT NULL AND removeTokenHash = ?2 AND optInLeaderboard = 1")
+    .bind(id, tokenHash)
+    .run();
   return (res.meta.changes ?? 0) > 0;
 }

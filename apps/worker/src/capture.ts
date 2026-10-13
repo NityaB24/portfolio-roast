@@ -1,5 +1,6 @@
 import puppeteer, { type Browser, type Page } from "@cloudflare/puppeteer";
 import type { Env } from "./env";
+import { guardUrl } from "./lib/url-guard";
 import { SignalsSchema, type Signals } from "./lib/schema";
 
 export const DESKTOP = { width: 1440, height: 900 } as const;
@@ -118,6 +119,10 @@ export async function captureSite(env: Env, url: string): Promise<CaptureResult>
     if (status !== null && (status === 401 || status === 403 || status === 429 || status === 503)) {
       return { ok: false, blocked: true, reason: `HTTP ${status}` };
     }
+    // The guard only saw the submitted URL; make sure redirects did not land somewhere it would have refused.
+    if (!guardUrl(page.url()).ok) {
+      return { ok: false, blocked: true, reason: "redirected to a disallowed address" };
+    }
     const bodyText = String(await page.evaluate(BODY_TEXT_SCRIPT));
     if (BLOCK_PATTERNS.some((re) => re.test(bodyText)) && bodyText.length < 600) {
       return { ok: false, blocked: true, reason: "anti-bot challenge page" };
@@ -157,8 +162,10 @@ export async function captureSite(env: Env, url: string): Promise<CaptureResult>
 
     return { ok: true, capture: { desktop, mobile, signals } };
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return { ok: false, blocked: true, reason: msg.slice(0, 200) };
+    // Raw browser errors can name internal infrastructure; log them, show visitors a generic reason.
+    console.error("capture failed", err);
+    const msg = err instanceof Error ? err.message : "";
+    return { ok: false, blocked: true, reason: /timeout/i.test(msg) ? "page took too long to load" : "page could not be loaded" };
   } finally {
     await browser?.close().catch(() => undefined);
   }

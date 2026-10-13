@@ -74,7 +74,13 @@ Browser Rendering minutes are the real bottleneck. See "Known limitations".
 Other guardrails:
 
 - SSRF guard (`apps/worker/src/lib/url-guard.ts`): only http/https, no credentials, allowlisted ports, blocks `localhost`, `*.local`, `*.internal`, single-label hosts, 10/8, 127/8, 169.254/16, 172.16/12, 192.168/16, 100.64/10, 0/8, multicast, `::1`, `fc00::/7`, `fe80::/10`, IPv4-mapped IPv6, decimal/hex IP disguises.
-- Quotas are checked before any expensive work and incremented only after a roast is persisted (blocked attempts count too, since they burn browser minutes).
+- Quotas are checked and then reserved (incremented) before any expensive work, so parallel requests cannot slip past the caps while a capture is running. Every attempt that reaches capture counts, including blocked and AI-failed ones, since they burn browser minutes.
+- An optional Cloudflare Rate Limiting binding (`ROAST_LIMITER` in `wrangler.toml`) adds a per-IP burst limit on `/api/roast` and on cache-miss `/og/*` renders. The Worker skips it if the binding is absent.
+- Request bodies are capped at 4 KB and URLs at 2048 characters. Redirect targets are re-checked with the SSRF guard after navigation.
+- Page-controlled text (title, h1, meta description) is clipped and the prompts tell the model to treat it and any screenshot text as untrusted.
+- Removal needs the secret `removeToken` returned once to the creator of a roast; only its SHA-256 is stored. CORS allows only `PUBLIC_WEB_ORIGIN` (plus localhost when that is itself a localhost origin).
+- Security headers: `apps/web/public/_headers` and `apps/web/functions/_middleware.ts` (CSP, nosniff, frame-ancestors, referrer policy); the Worker sets nosniff and `Referrer-Policy: no-referrer`.
+- Before going live: set `PUBLIC_WEB_ORIGIN` to your Pages URL, run `pnpm --filter @portfolio-roast/worker db:migrate` (adds migration `0003_remove_token.sql`), and set the Groq key with `wrangler secret put GROQ_API_KEY`. A CSP `connect-src` of `https:` is deliberately broad because the API origin is not known at build time; tighten it to your Worker origin if you want.
 - Cached results never touch Browser Rendering or Groq.
 - All errors are JSON `{ error, message, ... }` with `429` for `quota_exhausted`, `ip_limit`, `ai_rate_limited`.
 
@@ -184,7 +190,7 @@ The `functions/` directory is picked up automatically by Pages; `/r/:id` runs th
 
 ## Known limitations
 
-- `POST /api/remove/:id` is unauthenticated. Anyone with a result ID can hide that result. This is deliberate (no accounts anywhere), cheap to abuse, and acceptable for a toy with public IDs. Mitigation if it becomes a problem: require the removal to come from the same IP hash that created it, or add a signed token to the roast response.
+- Roasts created before migration `0003` have no removal token and cannot be removed through the API (hide them with `UPDATE roasts SET optInLeaderboard = 0 WHERE id = ...`). The removal token lives in the creator's browser `localStorage`; clearing site data loses the ability to remove from that browser.
 - Browser Rendering's 10 free minutes per day is the real bottleneck, not Groq or Workers. Two viewports plus a reload cost 15-25 s per roast; OG cards cost another few seconds the first time they are requested. `DAILY_QUOTA=300` is a ceiling, not a promise.
 - Sites that block headless Chrome, require JavaScript challenges, or exceed 15 s get a `blocked: true` record with score 0 and no screenshots. They are excluded from the leaderboard.
 - The SSRF guard classifies the hostname and IP literal in the URL; it does not resolve DNS. A public hostname whose A record points at a private address (DNS rebinding) passes the guard and is fetched by Browser Rendering inside Cloudflare's network. Cloudflare's own egress blocks RFC 1918 targets, but if you care, add a DNS-over-HTTPS lookup of the host in `url-guard.ts` and reject private answers before capture.

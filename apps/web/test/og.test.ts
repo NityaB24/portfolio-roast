@@ -17,4 +17,10 @@ describe("Pages Function OG injection", () => {
     expect(out).not.toContain('content="old"');
     expect(out).not.toContain("<title>Portfolio Roast</title>");
   });
+  it("does not expand $-sequences from the tags", () => {
+    const shell = "<html><head><title>x</title><!--OG--><!--/OG--></head><body>SECRET</body></html>";
+    const out = injectOg(shell, 'verdict $& and $\' and $` end');
+    expect(out).toContain("verdict $& and $' and $` end");
+    expect(out.match(/SECRET/g)).toHaveLength(1);
+  });
 });

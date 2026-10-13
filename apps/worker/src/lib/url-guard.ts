@@ -19,9 +19,12 @@ export type GuardReason =
   | "localhost"
   | "private_ip"
   | "internal_tld"
-  | "port";
+  | "port"
+  | "too_long";
 
 const BLOCKED_TLDS = new Set(["local", "internal", "localhost", "localdomain", "home", "lan", "intranet", "corp", "test", "example", "invalid", "onion"]);
+/** Longest raw input accepted; the URL is stored in D1 and echoed to the model. */
+export const MAX_URL_LENGTH = 2048;
 const ALLOWED_PORTS = new Set(["", "80", "443", "8080", "8443", "3000"]);
 
 /**
@@ -88,6 +91,10 @@ export function isPrivateIPv4(host: string): boolean {
   if (a === 172 && b >= 16 && b <= 31) return true; // 172.16.0.0/12
   if (a === 192 && b === 168) return true; // 192.168.0.0/16
   if (a === 100 && b >= 64 && b <= 127) return true; // carrier-grade NAT
+  if (a === 198 && (b === 18 || b === 19)) return true; // 198.18.0.0/15 benchmarking
+  if (a === 192 && b === 0 && (p[2] === 0 || p[2] === 2)) return true; // 192.0.0.0/24 IETF, 192.0.2.0/24 TEST-NET-1
+  if (a === 198 && b === 51 && p[2] === 100) return true; // TEST-NET-2
+  if (a === 203 && b === 0 && p[2] === 113) return true; // TEST-NET-3
   if (a >= 224) return true; // multicast + reserved + broadcast
   return false;
 }
@@ -173,6 +180,7 @@ export function isBlockedHostname(host: string): GuardReason | null {
  */
 export function guardUrl(raw: string): GuardResult {
   if (!raw || !raw.trim()) return { ok: false, reason: "empty" };
+  if (raw.length > MAX_URL_LENGTH) return { ok: false, reason: "too_long" };
   const u = parseInput(raw);
   if (!u) return { ok: false, reason: "invalid" };
   if (u.protocol !== "http:" && u.protocol !== "https:") return { ok: false, reason: "scheme" };
@@ -209,5 +217,6 @@ export const GUARD_MESSAGES: Record<GuardReason, string> = {
   localhost: "I cannot roast your localhost. Deploy it first, coward.",
   private_ip: "Private and internal addresses are off limits.",
   internal_tld: "Internal hostnames are off limits.",
+  too_long: "That URL is too long.",
   port: "That port is not allowed. Use 80, 443, 3000, 8080 or 8443.",
 };

@@ -7,7 +7,7 @@ import { PROMPT_VERSION, promptVersionFor } from "./ai/prompt";
 import { captureSite, renderHtmlToPng } from "./capture";
 import { intVar, type Env } from "./env";
 import * as db from "./lib/db";
-import { bytesToBase64, clientIp, fail } from "./lib/http";
+import { allowedOrigins, bytesToBase64, clientIp, fail, readJsonBody, sha256Hex } from "./lib/http";
 import * as quota from "./lib/quota";
 import { RoastModeSchema, type RoastRecord } from "./lib/schema";
 import { GUARD_MESSAGES, guardUrl } from "./lib/url-guard";
@@ -20,9 +20,17 @@ const SHOT_CACHE = "public, max-age=31536000, immutable";
 type AppEnv = { Bindings: Env };
 const app = new Hono<AppEnv>();
 
+const MAX_BODY_BYTES = 4096;
+const ID_PATTERN = /^[A-Za-z0-9_-]{6,32}$/;
+
 app.use("*", async (c, next) => {
-  const origin = c.env.PUBLIC_WEB_ORIGIN ?? "";
-  const allowed = [origin, "http://localhost:5173", "http://127.0.0.1:5173"].filter(Boolean);
+  await next();
+  c.header("x-content-type-options", "nosniff");
+  c.header("referrer-policy", "no-referrer");
+});
+
+app.use("*", async (c, next) => {
+  const allowed = allowedOrigins(c.env.PUBLIC_WEB_ORIGIN);
   return cors({
     origin: (reqOrigin) => (allowed.includes(reqOrigin) ? reqOrigin : allowed[0] ?? ""),
     allowMethods: ["GET", "POST", "OPTIONS"],
@@ -48,12 +56,12 @@ app.get("/api/quota", async (c) => {
 });
 
 app.post("/api/roast", async (c) => {
-  let body: { url?: unknown; mode?: unknown };
-  try {
-    body = (await c.req.json()) as { url?: unknown; mode?: unknown };
-  } catch {
+  const parsedBody = await readJsonBody(c, MAX_BODY_BYTES);
+  if (!parsedBody.ok) {
+    if (parsedBody.reason === "too_large") return fail(c, 413, "too_large", "Request body is too large.");
     return fail(c, 400, "bad_json", "Body must be JSON: { \"url\": \"https://...\", \"mode\": \"brutal\" | \"comedy\" }");
   }
+  const body = (parsedBody.json && typeof parsedBody.json === "object" ? parsedBody.json : {}) as { url?: unknown; mode?: unknown };
   if (typeof body.url !== "string") return fail(c, 400, "bad_url", GUARD_MESSAGES.empty);
   const modeParsed = RoastModeSchema.safeParse(body.mode ?? undefined);
   if (!modeParsed.success) return fail(c, 400, "bad_mode", 'mode must be "brutal" or "comedy".');
@@ -67,10 +75,14 @@ app.post("/api/roast", async (c) => {
   const cached = await db.getFreshByUrl(c.env.DB, normalizedUrl, mode, CACHE_TTL_MS);
   if (cached) return c.json({ ...cached, cached: true });
 
-  // 2. Quotas (checked before the expensive work, incremented after success).
+  // 2. Quotas. Checked, then reserved up front: the expensive work below takes 15-25 s,
+  //    and counting only afterwards would let one client fan out parallel requests past the caps.
   const limit = intVar(c.env.DAILY_QUOTA, 300);
   const perIp = intVar(c.env.PER_IP_DAILY, 5);
   const ipHash = await quota.hashIp(clientIp(c));
+  if (c.env.ROAST_LIMITER && !(await c.env.ROAST_LIMITER.limit({ key: ipHash })).success) {
+    return fail(c, 429, "rate_limited", "Slow down. Try again in a minute.");
+  }
   const [global, mine] = await Promise.all([quota.readGlobal(c.env.QUOTA, limit), quota.readIp(c.env.QUOTA, ipHash)]);
   if (global.used >= limit) {
     return fail(c, 429, "quota_exhausted", "Today's roasts are all used up. Come back after midnight UTC.", { resetsAt: global.resetsAt });
@@ -79,8 +91,12 @@ app.post("/api/roast", async (c) => {
     return fail(c, 429, "ip_limit", `You have used your ${perIp} roasts for today.`, { resetsAt: global.resetsAt });
   }
 
+  await quota.incrementBoth(c.env.QUOTA, ipHash);
+
   // 3. Capture + signals.
   const id = nanoid(12);
+  const removeToken = nanoid(24);
+  const removeTokenHash = await sha256Hex(removeToken);
   const createdAt = new Date().toISOString();
   const shot = await captureSite(c.env, normalizedUrl);
 
@@ -102,10 +118,8 @@ app.post("/api/roast", async (c) => {
       createdAt,
       optInLeaderboard: true,
     };
-    await db.insert(c.env.DB, record);
-    // Blocked attempts still cost Browser Rendering minutes, so they count.
-    await quota.incrementBoth(c.env.QUOTA, ipHash);
-    return c.json({ ...record, cached: false, blockedReason: shot.reason });
+    await db.insert(c.env.DB, record, removeTokenHash);
+    return c.json({ ...record, cached: false, blockedReason: shot.reason, removeToken });
   }
 
   // 4. Store screenshots.
@@ -148,9 +162,8 @@ app.post("/api/roast", async (c) => {
     createdAt,
     optInLeaderboard: true,
   };
-  await db.insert(c.env.DB, record);
-  await quota.incrementBoth(c.env.QUOTA, ipHash);
-  return c.json({ ...record, cached: false });
+  await db.insert(c.env.DB, record, removeTokenHash);
+  return c.json({ ...record, cached: false, removeToken });
 });
 
 app.get("/api/roast/:id", async (c) => {
@@ -198,15 +211,21 @@ app.get("/api/history", async (c) => {
 });
 
 app.post("/api/remove/:id", async (c) => {
-  // Intentionally unauthenticated one-click removal. See README "Known limitations".
-  const ok = await db.optOut(c.env.DB, c.req.param("id"));
+  // Requires the removal token returned once, in the response that created the roast.
+  const parsedBody = await readJsonBody(c, 1024);
+  const token = parsedBody.ok && parsedBody.json && typeof parsedBody.json === "object" ? (parsedBody.json as { token?: unknown }).token : undefined;
+  const id = c.req.param("id");
+  if (typeof token !== "string" || token.length < 16 || token.length > 64 || !ID_PATTERN.test(id)) {
+    return fail(c, 404, "not_found", "Nothing to remove.");
+  }
+  const ok = await db.optOut(c.env.DB, id, await sha256Hex(token));
   if (!ok) return fail(c, 404, "not_found", "Nothing to remove.");
   return c.json({ ok: true });
 });
 
 app.get("/og/:file", async (c) => {
   const id = c.req.param("file").replace(/\.png$/, "");
-  if (!/^[A-Za-z0-9_-]{6,32}$/.test(id)) return fail(c, 404, "not_found", "Bad id.");
+  if (!ID_PATTERN.test(id)) return fail(c, 404, "not_found", "Bad id.");
   const key = `og/${id}.png`;
   const existing = await c.env.SHOTS.get(key);
   if (existing) {
@@ -214,6 +233,10 @@ app.get("/og/:file", async (c) => {
   }
   const rec = await db.getById(c.env.DB, id);
   if (!rec || !rec.optInLeaderboard) return fail(c, 404, "not_found", "Removed.");
+  // Only cache misses launch a browser, so only they are rate limited.
+  if (c.env.ROAST_LIMITER && !(await c.env.ROAST_LIMITER.limit({ key: `og:${await quota.hashIp(clientIp(c))}` })).success) {
+    return fail(c, 429, "rate_limited", "Slow down. Try again in a minute.");
+  }
   const png = await renderHtmlToPng(c.env, ogHtml(rec));
   await c.env.SHOTS.put(key, png, { httpMetadata: { contentType: "image/png" } });
   return new Response(png, { headers: { "content-type": "image/png", "cache-control": SHOT_CACHE } });

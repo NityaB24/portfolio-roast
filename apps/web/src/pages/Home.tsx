@@ -2,7 +2,7 @@ import { useState, type FormEvent, type ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import LoadingSteps from "../components/LoadingSteps";
 import QuotaBar from "../components/QuotaBar";
-import { api, ApiError, MODES, type RoastMode } from "../lib/api";
+import { api, ApiError, MODES, saveRemoveToken, type RoastMode } from "../lib/api";
 
 const TICKER = ["HIERARCHY", "COPY", "PERFORMANCE", "MOBILE", "ORIGINALITY", "ACCESSIBILITY"];
 
@@ -28,6 +28,7 @@ export default function Home() {
     setStartedAt(Date.now());
     try {
       const rec = await api.roast(url.trim(), mode);
+      saveRemoveToken(rec);
       navigate(`/r/${rec.id}`, { state: { record: rec } });
     } catch (err) {
       setStartedAt(null);

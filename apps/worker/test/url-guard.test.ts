@@ -28,11 +28,11 @@ describe("normalizeUrl", () => {
 });
 
 describe("IPv4 classification", () => {
-  it.each(["10.0.0.1", "10.255.255.255", "127.0.0.1", "127.9.9.9", "169.254.169.254", "172.16.0.1", "172.31.255.254", "192.168.1.1", "0.0.0.0", "100.64.0.1", "224.0.0.1", "255.255.255.255"])(
+  it.each(["10.0.0.1", "10.255.255.255", "127.0.0.1", "127.9.9.9", "169.254.169.254", "172.16.0.1", "172.31.255.254", "192.168.1.1", "0.0.0.0", "100.64.0.1", "224.0.0.1", "255.255.255.255", "198.18.0.1", "198.19.255.254", "192.0.0.8", "192.0.2.1", "198.51.100.7", "203.0.113.9"])(
     "blocks %s",
     (ip) => expect(isPrivateIPv4(ip)).toBe(true),
   );
-  it.each(["8.8.8.8", "1.1.1.1", "172.15.0.1", "172.32.0.1", "192.167.1.1", "11.0.0.1", "100.63.0.1", "100.128.0.1"])("allows %s", (ip) => expect(isPrivateIPv4(ip)).toBe(false));
+  it.each(["8.8.8.8", "1.1.1.1", "172.15.0.1", "172.32.0.1", "192.167.1.1", "11.0.0.1", "100.63.0.1", "100.128.0.1", "198.17.0.1", "198.20.0.1", "192.0.1.1", "203.0.114.1"])("allows %s", (ip) => expect(isPrivateIPv4(ip)).toBe(false));
 });
 
 describe("IPv6 classification", () => {
@@ -113,5 +113,16 @@ describe("guardUrl (SSRF)", () => {
     const r = guardUrl("localhost:3000");
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.reason).toBe("localhost");
+  });
+});
+
+describe("input length", () => {
+  it("rejects absurdly long input", () => {
+    const r = guardUrl(`https://example.com/${"a".repeat(2100)}`);
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.reason).toBe("too_long");
+  });
+  it("accepts a long but reasonable URL", () => {
+    expect(guardUrl(`https://example.com/${"a".repeat(500)}`).ok).toBe(true);
   });
 });

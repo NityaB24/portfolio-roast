@@ -43,3 +43,12 @@ bucket_name = "portfolio-roast-shots"
 
 [browser]
 binding = "BROWSER"
+
+# Burst limiter in front of the KV daily quotas (per-IP-hash, per Cloudflare location).
+# Optional: the Worker skips it when the binding is absent. Pick any unique namespace_id in your account.
+[[ratelimits]]
+name = "ROAST_LIMITER"
+namespace_id = "1001"
+  [ratelimits.simple]
+  limit = 4
+  period = 60

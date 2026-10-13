@@ -5,6 +5,8 @@ export interface Env {
   QUOTA: KVNamespace;
   SHOTS: R2Bucket;
   BROWSER: BrowserWorker;
+  /** Optional Cloudflare Rate Limiting binding; burst guard in front of the KV daily quotas. */
+  ROAST_LIMITER?: RateLimit;
   GROQ_API_KEY?: string;
   DAILY_QUOTA?: string;
   PER_IP_DAILY?: string;

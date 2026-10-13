@@ -51,9 +51,10 @@ export function injectOg(html: string, tags: string): string {
   // Replace the default <title> and the <!--OG-->...<!--/OG--> block from index.html.
   const withoutTitle = html.replace(/<title>[^<]*<\/title>\s*/, "").replace(/<meta name="description"[^>]*>\s*/, "");
   if (/<!--OG-->[\s\S]*?<!--\/OG-->/.test(withoutTitle)) {
-    return withoutTitle.replace(/<!--OG-->[\s\S]*?<!--\/OG-->/, tags);
+    // Function replacers: a string replacement would expand "$&" / "$'" sequences found in the tags.
+    return withoutTitle.replace(/<!--OG-->[\s\S]*?<!--\/OG-->/, () => tags);
   }
-  return withoutTitle.replace("</head>", `${tags}\n  </head>`);
+  return withoutTitle.replace("</head>", () => `${tags}\n  </head>`);
 }
 
 export const onRequestGet: PagesFunction<Env> = async (ctx) => {

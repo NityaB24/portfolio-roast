@@ -100,12 +100,12 @@ cd ../web && cp .env.example .env              # VITE_API_BASE=http://localhost:
 cd ../.. && pnpm dev                           # worker on :8787, web on :5173
 ```
 
-D1, KV and R2 are simulated locally by Miniflare. Browser Rendering is the exception and depends on the wrangler major:
+D1, KV and R2 are simulated locally by Miniflare. Browser Rendering is simulated too (wrangler 4): on the first roast, wrangler downloads a pinned Chrome build (~150 MB, once, into `~/.cache/.wrangler/chrome`) and drives it through the `BROWSER` binding. Two things to know:
 
-- **wrangler 3** (what `package.json` pins, so the committed lockfile stays valid): the `BROWSER` binding cannot be simulated. Run the worker against your real account with `cd apps/worker && npx wrangler dev --remote` (spends real Browser Rendering minutes, uses the remote D1/KV/R2 too).
-- **wrangler 4**: `cd apps/worker && npx wrangler@4 dev` simulates the binding by downloading a pinned Chrome build (~150 MB, once, into `~/.cache/.wrangler/chrome`) and driving it locally. The same `wrangler.toml` works unchanged. If you run as root (Docker, Codespaces, cloud sandboxes) Chrome refuses to start without `--no-sandbox`; Miniflare only adds that flag when `CI` is set, so use `CI=1 npx wrangler@4 dev`. The local Chrome needs real DNS and outbound network; without them every roast comes back `blocked: true`.
+- If you run as root (Docker, Codespaces, cloud sandboxes) Chrome refuses to start without `--no-sandbox`. Miniflare only adds that flag when `CI` is set, so start the worker with `CI=1 pnpm dev` there.
+- The local Chrome needs real DNS and outbound network. Without them every roast comes back `blocked: true`; serve a fixture page on a hostname mapped in `/etc/hosts` to exercise the pipeline (see "Local smoke test").
 
-Upgrading the repo itself is one command when you are ready: `pnpm -r add -D wrangler@^4 @cloudflare/workers-types@latest` (the tsconfigs already reference the un-dated `@cloudflare/workers-types` entry, which both majors ship).
+To run against your real account instead (spends Browser Rendering minutes, uses the remote D1/KV/R2): `cd apps/worker && npx wrangler dev --remote`.
 
 ### Mock mode
 

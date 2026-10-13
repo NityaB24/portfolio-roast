@@ -1,0 +1,45 @@
+name = "portfolio-roast-api"
+main = "src/index.ts"
+compatibility_date = "2024-12-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Worker route: deploy on the free workers.dev subdomain, or attach a custom
+# domain in the Cloudflare dashboard. The frontend talks to this origin via
+# VITE_API_BASE.
+workers_dev = true
+
+[observability]
+enabled = true
+
+[vars]
+# Global cap on AI + Browser Rendering roasts per UTC day. Keeps Browser
+# Rendering (10 min/day free) and Groq usage inside free tiers.
+DAILY_QUOTA = "300"
+# Roasts a single IP may trigger per UTC day.
+PER_IP_DAILY = "5"
+# Origin of the Cloudflare Pages frontend; used for CORS and share links.
+# TODO: replace with your Pages URL once deployed.
+PUBLIC_WEB_ORIGIN = "http://localhost:5173"
+
+# Secrets (set with `wrangler secret put GROQ_API_KEY`). Without it the worker
+# runs in mock mode and returns a deterministic fixture roast.
+
+[[d1_databases]]
+binding = "DB"
+database_name = "portfolio-roast"
+# TODO: replace with the id printed by `wrangler d1 create portfolio-roast`
+database_id = "00000000-0000-0000-0000-000000000000"
+migrations_dir = "migrations"
+
+[[kv_namespaces]]
+binding = "QUOTA"
+# TODO: replace with the id printed by `wrangler kv namespace create QUOTA`
+id = "0000000000000000000000000000dead"
+
+[[r2_buckets]]
+binding = "SHOTS"
+# Create with `wrangler r2 bucket create portfolio-roast-shots`
+bucket_name = "portfolio-roast-shots"
+
+[browser]
+binding = "BROWSER"

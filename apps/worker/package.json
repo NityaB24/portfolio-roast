@@ -1,0 +1,27 @@
+{
+  "name": "@portfolio-roast/worker",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "build": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run",
+    "deploy": "wrangler deploy",
+    "db:migrate:local": "wrangler d1 migrations apply portfolio-roast --local",
+    "db:migrate": "wrangler d1 migrations apply portfolio-roast --remote",
+    "types": "wrangler types"
+  },
+  "dependencies": {
+    "@cloudflare/puppeteer": "^1.0.2",
+    "hono": "^4.6.14",
+    "nanoid": "^5.0.9",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20241218.0",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8",
+    "wrangler": "^3.99.0"
+  }
+}

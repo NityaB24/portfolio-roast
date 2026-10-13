@@ -1,0 +1,2 @@
+# Copy to .dev.vars for local `wrangler dev`. Leave GROQ_API_KEY out to run in mock mode.
+GROQ_API_KEY=gsk_your_key_here

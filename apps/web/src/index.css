@@ -1,0 +1,131 @@
+@import "tailwindcss";
+
+@theme {
+  --color-ink: #0b0b0c;
+  --color-ink-2: #141416;
+  --color-ink-3: #1f1f23;
+  --color-bone: #f4f1ea;
+  --color-bone-2: #b8b4ab;
+  --color-bone-3: #6f6b63;
+  --color-blood: #ff3b3b;
+  --color-blood-2: #c91f1f;
+  --color-sev-high: #ff3b3b;
+  --color-sev-med: #ffb02e;
+  --color-sev-low: #4cc9f0;
+  --color-good: #7cff6b;
+  --font-display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+:root {
+  color-scheme: dark;
+}
+
+html,
+body {
+  background: var(--color-ink);
+  color: var(--color-bone);
+  font-family: var(--font-display);
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+  background-size: 48px 48px;
+  background-attachment: fixed;
+}
+
+::selection {
+  background: var(--color-blood);
+  color: var(--color-ink);
+}
+
+.display {
+  font-weight: 900;
+  letter-spacing: -0.045em;
+  line-height: 0.9;
+}
+
+.tag {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.marquee {
+  display: flex;
+  gap: 3rem;
+  white-space: nowrap;
+  animation: marquee 28s linear infinite;
+}
+
+@keyframes marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+@keyframes pulse-ring {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, currentColor 55%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 10px transparent;
+  }
+}
+
+.hotspot {
+  position: absolute;
+  border: 2px solid currentColor;
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    border-width 0.15s ease;
+  background-color: color-mix(in srgb, currentColor 10%, transparent);
+}
+.hotspot:hover,
+.hotspot[data-active="true"] {
+  background-color: color-mix(in srgb, currentColor 24%, transparent);
+  border-width: 3px;
+  animation: pulse-ring 1.2s ease-out infinite;
+  z-index: 2;
+}
+.hotspot .pin {
+  position: absolute;
+  top: -12px;
+  left: -12px;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  background: currentColor;
+  color: var(--color-ink);
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 12px;
+  display: grid;
+  place-items: center;
+}
+.hotspot .pin span {
+  color: var(--color-ink);
+}
+
+.strike {
+  background-image: linear-gradient(transparent 55%, var(--color-blood) 55%, var(--color-blood) 78%, transparent 78%);
+}
+
+input::placeholder {
+  color: var(--color-bone-3);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .marquee,
+  .hotspot {
+    animation: none;
+  }
+}

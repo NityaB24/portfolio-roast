@@ -100,11 +100,36 @@ cd ../web && cp .env.example .env              # VITE_API_BASE=http://localhost:
 cd ../.. && pnpm dev                           # worker on :8787, web on :5173
 ```
 
-Browser Rendering requires a `[browser]` binding, which `wrangler dev` provides via a remote browser session (you may need `wrangler dev --remote` on older wrangler versions). Everything else runs locally in Miniflare.
+D1, KV and R2 are simulated locally by Miniflare. Browser Rendering is the exception and depends on the wrangler major:
+
+- **wrangler 3** (what `package.json` pins, so the committed lockfile stays valid): the `BROWSER` binding cannot be simulated. Run the worker against your real account with `cd apps/worker && npx wrangler dev --remote` (spends real Browser Rendering minutes, uses the remote D1/KV/R2 too).
+- **wrangler 4**: `cd apps/worker && npx wrangler@4 dev` simulates the binding by downloading a pinned Chrome build (~150 MB, once, into `~/.cache/.wrangler/chrome`) and driving it locally. The same `wrangler.toml` works unchanged. If you run as root (Docker, Codespaces, cloud sandboxes) Chrome refuses to start without `--no-sandbox`; Miniflare only adds that flag when `CI` is set, so use `CI=1 npx wrangler@4 dev`. The local Chrome needs real DNS and outbound network; without them every roast comes back `blocked: true`.
+
+Upgrading the repo itself is one command when you are ready: `pnpm -r add -D wrangler@^4 @cloudflare/workers-types@latest` (the tsconfigs already reference the un-dated `@cloudflare/workers-types` entry, which both majors ship).
 
 ### Mock mode
 
 If `GROQ_API_KEY` is not set, `roastWithAI()` returns a deterministic fixture seeded from the URL (`apps/worker/src/ai/fixture.ts`). Screenshots and signals are still real. Use this to develop the frontend without burning AI credits. The record is stored with the normal `promptVersion`, so delete your local D1 rows before testing a real key.
+
+### Local smoke test
+
+With the worker running in mock mode you can exercise the whole pipeline (capture, signals, R2, D1, OG card) without a Groq key or a public site:
+
+```bash
+# 1. serve any HTML page on an allowed port under a public-looking hostname
+echo "127.0.0.1 fixture.example.org" | sudo tee -a /etc/hosts
+npx http-server ./some-folder -p 3000
+
+# 2. roast it
+curl -X POST http://localhost:8787/api/roast -H 'content-type: application/json' \
+  -d '{"url":"http://fixture.example.org:3000/"}'
+
+# 3. look at what came back
+curl -o desktop.webp http://localhost:8787/api/shots/<id>/desktop.webp
+curl -o card.png    http://localhost:8787/og/<id>.png
+```
+
+Loopback addresses and `localhost` are rejected by the SSRF guard on purpose, which is why the hosts-file alias is needed.
 
 ### Scripts
 
@@ -112,7 +137,7 @@ If `GROQ_API_KEY` is not set, `roastWithAI()` returns a deterministic fixture se
 pnpm dev      # both apps
 pnpm build    # tsc --noEmit for worker + web + functions, vite build
 pnpm lint     # eslint (flat config, typescript-eslint, no `any`)
-pnpm test     # vitest: url guard / SSRF, quota keys, zod schema, Groq adapter, OG injection, share helpers
+pnpm test     # vitest: url guard / SSRF, URL normalization, quota keys, zod schema, Groq adapter, OG injection, share helpers
 pnpm deploy   # wrangler deploy (worker) + wrangler pages deploy (web)
 ```
 
@@ -150,6 +175,7 @@ The `functions/` directory is picked up automatically by Pages; `/r/:id` runs th
 - `POST /api/remove/:id` is unauthenticated. Anyone with a result ID can hide that result. This is deliberate (no accounts anywhere), cheap to abuse, and acceptable for a toy with public IDs. Mitigation if it becomes a problem: require the removal to come from the same IP hash that created it, or add a signed token to the roast response.
 - Browser Rendering's 10 free minutes per day is the real bottleneck, not Groq or Workers. Two viewports plus a reload cost 15-25 s per roast; OG cards cost another few seconds the first time they are requested. `DAILY_QUOTA=300` is a ceiling, not a promise.
 - Sites that block headless Chrome, require JavaScript challenges, or exceed 15 s get a `blocked: true` record with score 0 and no screenshots. They are excluded from the leaderboard.
+- The SSRF guard classifies the hostname and IP literal in the URL; it does not resolve DNS. A public hostname whose A record points at a private address (DNS rebinding) passes the guard and is fetched by Browser Rendering inside Cloudflare's network. Cloudflare's own egress blocks RFC 1918 targets, but if you care, add a DNS-over-HTTPS lookup of the host in `url-guard.ts` and reject private answers before capture.
 - KV is eventually consistent, so the global quota can overshoot by a few requests under concurrent load.
 - Hotspot coordinates come from a vision model and are approximate. They are clamped into the image but may still miss the intended element.
 - The leaderboard is public by default (`optInLeaderboard = 1`). There is no email verification that the submitter owns the site.

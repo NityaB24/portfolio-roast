@@ -4,6 +4,13 @@ export const REPO_URL = "https://github.com/NityaB24/portfolio-roast";
 export type Severity = "high" | "med" | "low";
 export type Category = "hierarchy" | "copy" | "performance" | "mobile" | "originality" | "accessibility";
 export type Viewport = "desktop" | "mobile";
+export type RoastMode = "brutal" | "comedy";
+
+export const MODES: Array<{ id: RoastMode; label: string; blurb: string }> = [
+  { id: "brutal", label: "Brutal", blurb: "Senior design lead. Cold, specific, fair." },
+  { id: "comedy", label: "Comedy roast", blurb: "Roast-battle headliner. Same facts, maximum jokes." },
+];
+export const MODE_LABEL: Record<RoastMode, string> = { brutal: "Brutal", comedy: "Comedy roast" };
 
 export interface RoastItem {
   severity: Severity;
@@ -39,6 +46,7 @@ export interface RoastRecord {
   compliments: string[];
   signals: Signals | null;
   promptVersion: string;
+  mode: RoastMode;
   blocked: boolean;
   createdAt: string;
   optInLeaderboard: boolean;
@@ -58,12 +66,14 @@ export interface LeaderboardEntry {
   domain: string;
   score: number;
   verdict: string;
+  mode: RoastMode;
   createdAt: string;
 }
 
 export interface HistoryEntry {
   id: string;
   score: number;
+  mode: RoastMode;
   createdAt: string;
 }
 
@@ -102,11 +112,11 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 export const api = {
   quota: () => request<Quota>("/api/quota"),
-  roast: (url: string) =>
+  roast: (url: string, mode: RoastMode = "brutal") =>
     request<RoastRecord>("/api/roast", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ url }),
+      body: JSON.stringify({ url, mode }),
     }),
   get: (id: string) => request<RoastRecord>(`/api/roast/${encodeURIComponent(id)}`),
   top: (period: "week" | "all") => request<{ entries: LeaderboardEntry[] }>(`/api/top?period=${period}`),

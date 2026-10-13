@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import Hotspots from "../components/Hotspots";
 import ScoreCountUp from "../components/ScoreCountUp";
-import { api, ApiError, domainOf, scoreTone, SEVERITY_CLASS, SEVERITY_LABEL, type HistoryEntry, type RoastRecord, type Viewport } from "../lib/api";
+import { api, ApiError, domainOf, MODE_LABEL, scoreTone, SEVERITY_CLASS, SEVERITY_LABEL, type HistoryEntry, type RoastRecord, type Viewport } from "../lib/api";
 import { formatCountdown, linkedInShareUrl, msUntilReroast, shareText, xShareUrl } from "../lib/share";
 
 export default function Result() {
@@ -60,12 +60,14 @@ export default function Result() {
 
   const pageUrl = typeof window !== "undefined" ? `${window.location.origin}/r/${id}` : `/r/${id}`;
   const improvement = useMemo(() => {
-    if (history.length < 2) return null;
-    const first = history[0];
-    const last = history[history.length - 1];
+    // Compare like with like: only roasts in the same mode as this one.
+    const same = rec ? history.filter((h) => h.mode === rec.mode) : history;
+    if (same.length < 2) return null;
+    const first = same[0];
+    const last = same[same.length - 1];
     if (!first || !last || first.score === last.score) return null;
-    return { from: first.score, to: last.score, count: history.length };
-  }, [history]);
+    return { from: first.score, to: last.score, count: same.length };
+  }, [history, rec]);
 
   if (error) {
     return (
@@ -105,7 +107,7 @@ export default function Result() {
     if (!canReroast || reroasting) return;
     setReroasting(true);
     try {
-      const fresh = await api.roast(rec!.normalizedUrl);
+      const fresh = await api.roast(rec!.normalizedUrl, rec!.mode);
       navigate(`/r/${fresh.id}`, { state: { record: fresh } });
       setRec(fresh);
       setActive(null);
@@ -128,7 +130,7 @@ export default function Result() {
     }
   }
 
-  const text = shareText(domain, rec.score);
+  const text = shareText(domain, rec.score, rec.mode);
 
   return (
     <article className="mx-auto max-w-[1400px] px-4 sm:px-8 pt-10 sm:pt-16">
@@ -148,6 +150,8 @@ export default function Result() {
             </a>
             <span>·</span>
             <time dateTime={rec.createdAt}>{new Date(rec.createdAt).toLocaleString()}</time>
+            <span>·</span>
+            <span className={rec.mode === "comedy" ? "text-sev-med" : "text-blood"}>{MODE_LABEL[rec.mode] ?? rec.mode}</span>
             {rec.cached && <span className="text-bone-3">· cached</span>}
             {improvement && (
               <span className={improvement.to > improvement.from ? "text-good" : "text-blood"}>

@@ -19,3 +19,10 @@ describe("share helpers", () => {
     expect(formatCountdown(3661 * 1000)).toBe("01:01:01");
   });
 });
+
+describe("share text per mode", () => {
+  it("mentions the comedy set in comedy mode", () => {
+    expect(shareText("jane.example", 40, "comedy")).toContain("comedy set");
+    expect(shareText("jane.example", 40)).not.toContain("comedy");
+  });
+});

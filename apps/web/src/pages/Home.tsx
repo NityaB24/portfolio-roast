@@ -2,13 +2,20 @@ import { useState, type FormEvent, type ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import LoadingSteps from "../components/LoadingSteps";
 import QuotaBar from "../components/QuotaBar";
-import { api, ApiError } from "../lib/api";
+import { api, ApiError, MODES, type RoastMode } from "../lib/api";
 
 const TICKER = ["HIERARCHY", "COPY", "PERFORMANCE", "MOBILE", "ORIGINALITY", "ACCESSIBILITY"];
 
 export default function Home() {
   const navigate = useNavigate();
   const [url, setUrl] = useState("");
+  const [mode, setMode] = useState<RoastMode>(() => {
+    try {
+      return window.localStorage.getItem("roast-mode") === "comedy" ? "comedy" : "brutal";
+    } catch {
+      return "brutal";
+    }
+  });
   const [startedAt, setStartedAt] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -20,7 +27,7 @@ export default function Home() {
     setError(null);
     setStartedAt(Date.now());
     try {
-      const rec = await api.roast(url.trim());
+      const rec = await api.roast(url.trim(), mode);
       navigate(`/r/${rec.id}`, { state: { record: rec } });
     } catch (err) {
       setStartedAt(null);
@@ -31,6 +38,15 @@ export default function Home() {
       } else {
         setError("Something exploded. Try again.");
       }
+    }
+  }
+
+  function pickMode(m: RoastMode) {
+    setMode(m);
+    try {
+      window.localStorage.setItem("roast-mode", m);
+    } catch {
+      // private mode, ignore
     }
   }
 
@@ -81,6 +97,32 @@ export default function Home() {
                 {error}
               </p>
             )}
+
+            <fieldset className="mt-8">
+              <legend className="tag text-bone-2 mb-3">Roast style</legend>
+              <div className="grid sm:grid-cols-2 gap-3 max-w-2xl">
+                {MODES.map((m) => {
+                  const on = mode === m.id;
+                  return (
+                    <button
+                      key={m.id}
+                      type="button"
+                      role="radio"
+                      aria-checked={on}
+                      onClick={() => pickMode(m.id)}
+                      className={
+                        "text-left border p-4 transition-colors " +
+                        (on ? (m.id === "comedy" ? "border-sev-med bg-sev-med/10" : "border-blood bg-blood/10") : "border-ink-3 hover:border-bone-3")
+                      }
+                    >
+                      <span className={"display text-2xl " + (on ? "text-bone" : "text-bone-2")}>{m.label}</span>
+                      <span className="block mt-1 text-sm text-bone-2">{m.blurb}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </fieldset>
+
             <div className="mt-10">
               <QuotaBar />
             </div>
@@ -90,7 +132,7 @@ export default function Home() {
         {busy && startedAt !== null && (
           <div>
             <p className="tag text-bone-3 mt-14">
-              Roasting <span className="text-bone">{url}</span>
+              {mode === "comedy" ? "Comedy-roasting" : "Roasting"} <span className="text-bone">{url}</span>
             </p>
             <LoadingSteps startedAt={startedAt} />
           </div>

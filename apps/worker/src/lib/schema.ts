@@ -3,6 +3,9 @@ import { z } from "zod";
 export const Severity = z.enum(["high", "med", "low"]);
 export const Category = z.enum(["hierarchy", "copy", "performance", "mobile", "originality", "accessibility"]);
 export const Viewport = z.enum(["desktop", "mobile"]);
+/** "brutal" = senior design lead (default). "comedy" = roast-battle headliner, maximum jokes, same facts. */
+export const RoastModeSchema = z.enum(["brutal", "comedy"]).default("brutal");
+export type RoastMode = z.infer<typeof RoastModeSchema>;
 
 const fraction = z.coerce.number().min(0).max(1);
 
@@ -62,6 +65,7 @@ export interface RoastRecord {
   compliments: string[];
   signals: Signals | null;
   promptVersion: string;
+  mode: RoastMode;
   blocked: boolean;
   createdAt: string;
   optInLeaderboard: boolean;

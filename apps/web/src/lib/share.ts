@@ -1,6 +1,7 @@
-export function shareText(domain: string, score: number): string {
+export function shareText(domain: string, score: number, mode: "brutal" | "comedy" = "brutal"): string {
   const line = score >= 85 ? "survived" : score >= 60 ? "limped out of" : "got destroyed by";
-  return `${domain} ${line} Portfolio Roast with a ${score}/100. Paste yours if you dare.`;
+  const what = mode === "comedy" ? "the Portfolio Roast comedy set" : "Portfolio Roast";
+  return `${domain} ${line} ${what} with a ${score}/100. Paste yours if you dare.`;
 }
 
 export function xShareUrl(text: string, url: string): string {

@@ -71,7 +71,10 @@ export default function Top() {
                 <li key={r.id}>
                   <Link to={`/r/${r.id}`} className="group grid grid-cols-[3rem_1fr_auto] sm:grid-cols-[4rem_1fr_minmax(0,2fr)_auto] gap-4 sm:gap-8 items-center py-5 hover:bg-ink-2 -mx-4 px-4 transition-colors">
                     <span className="tag text-bone-3">{String(i + 1).padStart(2, "0")}</span>
-                    <span className="display text-xl sm:text-3xl truncate group-hover:text-blood transition-colors">{r.domain}</span>
+                    <span className="min-w-0 flex items-baseline gap-3">
+                      <span className="display text-xl sm:text-3xl truncate group-hover:text-blood transition-colors">{r.domain}</span>
+                      {r.mode === "comedy" && <span className="tag text-sev-med shrink-0 hidden sm:inline">comedy</span>}
+                    </span>
                     <span className="hidden sm:block text-bone-2 truncate">{r.verdict}</span>
                     <span className={"display text-4xl sm:text-5xl text-right " + tone.color} style={{ fontVariantNumeric: "tabular-nums" }}>
                       {r.score}

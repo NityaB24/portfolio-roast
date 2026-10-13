@@ -2,18 +2,21 @@
  * The single AI boundary. Swap this file to move to Gemini, OpenAI, Workers AI,
  * etc. Everything else only depends on `roastWithAI` and `RoastResult`.
  */
-import { RoastResultSchema, type RoastResult, type Signals } from "../lib/schema";
+import { RoastResultSchema, type RoastMode, type RoastResult, type Signals } from "../lib/schema";
 import { fixtureRoast } from "./fixture";
-import { SYSTEM_PROMPT, factsBlock } from "./prompt";
+import { factsBlock, systemPromptFor } from "./prompt";
 
 /** Groq vision-capable model. Change here only. */
 export const GROQ_MODEL = "meta-llama/llama-4-scout-17b-16e-instruct";
 export const GROQ_ENDPOINT = "https://api.groq.com/openai/v1/chat/completions";
-const TEMPERATURE = 0.4;
+/** Brutal mode wants precision; comedy mode gets a little more rope for jokes. */
+const TEMPERATURE: Record<RoastMode, number> = { brutal: 0.4, comedy: 0.7 };
 const MAX_TOKENS = 2048;
 
 export interface RoastInput {
   url: string;
+  /** Defaults to "brutal". */
+  mode?: RoastMode;
   signals: Signals;
   /** data:image/webp;base64,... */
   desktopDataUrl: string;
@@ -38,19 +41,20 @@ interface ChatCompletion {
 }
 
 export async function roastWithAI(input: RoastInput): Promise<RoastResult> {
+  const mode: RoastMode = input.mode ?? "brutal";
   if (!input.apiKey) {
     // Mock mode: deterministic fixture so the UI can be built without a key.
-    return fixtureRoast(input.url, input.signals);
+    return fixtureRoast(input.url, input.signals, mode);
   }
   const f = input.fetchImpl ?? fetch;
 
   const body = {
     model: GROQ_MODEL,
-    temperature: TEMPERATURE,
+    temperature: TEMPERATURE[mode],
     max_tokens: MAX_TOKENS,
     response_format: { type: "json_object" },
     messages: [
-      { role: "system", content: SYSTEM_PROMPT },
+      { role: "system", content: systemPromptFor(mode) },
       {
         role: "user",
         content: [

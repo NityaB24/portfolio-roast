@@ -3,13 +3,13 @@ import { cors } from "hono/cors";
 import { nanoid } from "nanoid";
 import { roastWithAI, AIError } from "./ai/groq";
 import { blockedRoast, BLOCKED_PROMPT_VERSION } from "./ai/fixture";
-import { PROMPT_VERSION } from "./ai/prompt";
+import { PROMPT_VERSION, promptVersionFor } from "./ai/prompt";
 import { captureSite, renderHtmlToPng } from "./capture";
 import { intVar, type Env } from "./env";
 import * as db from "./lib/db";
 import { bytesToBase64, clientIp, fail } from "./lib/http";
 import * as quota from "./lib/quota";
-import type { RoastRecord } from "./lib/schema";
+import { RoastModeSchema, type RoastRecord } from "./lib/schema";
 import { GUARD_MESSAGES, guardUrl } from "./lib/url-guard";
 import { ogHtml } from "./og";
 
@@ -48,20 +48,23 @@ app.get("/api/quota", async (c) => {
 });
 
 app.post("/api/roast", async (c) => {
-  let body: { url?: unknown };
+  let body: { url?: unknown; mode?: unknown };
   try {
-    body = (await c.req.json()) as { url?: unknown };
+    body = (await c.req.json()) as { url?: unknown; mode?: unknown };
   } catch {
-    return fail(c, 400, "bad_json", "Body must be JSON: { \"url\": \"https://...\" }");
+    return fail(c, 400, "bad_json", "Body must be JSON: { \"url\": \"https://...\", \"mode\": \"brutal\" | \"comedy\" }");
   }
   if (typeof body.url !== "string") return fail(c, 400, "bad_url", GUARD_MESSAGES.empty);
+  const modeParsed = RoastModeSchema.safeParse(body.mode ?? undefined);
+  if (!modeParsed.success) return fail(c, 400, "bad_mode", 'mode must be "brutal" or "comedy".');
+  const mode = modeParsed.data;
 
   const guard = guardUrl(body.url);
   if (!guard.ok) return fail(c, 400, "bad_url", GUARD_MESSAGES[guard.reason], { reason: guard.reason });
   const normalizedUrl = guard.url;
 
   // 1. Cache hit?
-  const cached = await db.getFreshByUrl(c.env.DB, normalizedUrl, CACHE_TTL_MS);
+  const cached = await db.getFreshByUrl(c.env.DB, normalizedUrl, mode, CACHE_TTL_MS);
   if (cached) return c.json({ ...cached, cached: true });
 
   // 2. Quotas (checked before the expensive work, incremented after success).
@@ -94,6 +97,7 @@ app.post("/api/roast", async (c) => {
       compliments: r.compliments,
       signals: null,
       promptVersion: BLOCKED_PROMPT_VERSION,
+      mode,
       blocked: true,
       createdAt,
       optInLeaderboard: true,
@@ -115,6 +119,7 @@ app.post("/api/roast", async (c) => {
   try {
     result = await roastWithAI({
       url: normalizedUrl,
+      mode,
       signals: shot.capture.signals,
       desktopDataUrl: `data:image/webp;base64,${bytesToBase64(shot.capture.desktop)}`,
       mobileDataUrl: `data:image/webp;base64,${bytesToBase64(shot.capture.mobile)}`,
@@ -137,7 +142,8 @@ app.post("/api/roast", async (c) => {
     roasts: result.roasts,
     compliments: result.compliments,
     signals: shot.capture.signals,
-    promptVersion: PROMPT_VERSION,
+    promptVersion: promptVersionFor(mode),
+    mode,
     blocked: false,
     createdAt,
     optInLeaderboard: true,

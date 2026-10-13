@@ -9,6 +9,15 @@ https://yourname.dev  ->  58/100  "A dark-mode template wearing a trench coat."
                            #14 on the weekly leaderboard
 ```
 
+## Two roast modes
+
+| Mode | Persona | Temperature | Prompt version |
+| --- | --- | --- | --- |
+| `brutal` (default) | Senior design lead. Cold, specific, fair. | 0.4 | `2026-10-13.1` |
+| `comedy` | Roast-battle headliner. Same facts and the same honest score, delivered as a stand-up set: setups, bits, callbacks, absurd comparisons. Fixes stay sincere. | 0.7 | `comedy.2026-10-13.1` |
+
+Pick the mode on the home page (remembered in `localStorage`) or send `{ "url": ..., "mode": "comedy" }` to `POST /api/roast`. Each mode has its own 24h cache entry and its own prompt version, so a URL can hold one of each; the leaderboard shows the latest roast per URL regardless of mode, and "improved from X to Y" only compares roasts in the same mode. Both personas share the same output contract, the same safety rules (roast the work, never the person, PG-13) and the same zod validation. The comedy persona lives next to the brutal one in `apps/worker/src/ai/prompt.ts`.
+
 ## Architecture
 
 ```
@@ -78,20 +87,23 @@ git clone https://github.com/NityaB24/portfolio-roast.git
 cd portfolio-roast
 pnpm install
 
-# Cloudflare resources (one time)
-cd apps/worker
+# Cloudflare resources (one time). Either run the script...
 npx wrangler login
+GROQ_API_KEY=gsk_... pnpm setup               # creates D1 + KV + R2, writes IDs into wrangler.toml,
+                                               # applies migrations remotely, stores the secret
+
+# ...or do the same by hand:
+cd apps/worker
 npx wrangler d1 create portfolio-roast          # paste database_id into wrangler.toml
 npx wrangler kv namespace create QUOTA         # paste id into wrangler.toml
 npx wrangler r2 bucket create portfolio-roast-shots
+pnpm db:migrate                                # remote D1 (applies migrations/0001 and 0002)
+npx wrangler secret put GROQ_API_KEY           # skip for mock mode
 
-# Schema
+# Local schema + secrets
+cd apps/worker
 pnpm db:migrate:local                          # for wrangler dev
-pnpm db:migrate                                # remote D1
-
-# Secrets (skip for mock mode)
-cp .dev.vars.example .dev.vars                 # local: edit GROQ_API_KEY
-npx wrangler secret put GROQ_API_KEY           # remote
+cp .dev.vars.example .dev.vars                 # local: edit GROQ_API_KEY (or leave it out for mock mode)
 
 # Frontend env
 cd ../web && cp .env.example .env              # VITE_API_BASE=http://localhost:8787
@@ -145,7 +157,7 @@ pnpm deploy   # wrangler deploy (worker) + wrangler pages deploy (web)
 
 ### Worker
 
-1. Fill the `# TODO: replace` IDs in `apps/worker/wrangler.toml` and set `PUBLIC_WEB_ORIGIN` to your Pages URL (for CORS).
+1. Fill the `# TODO: replace` IDs in `apps/worker/wrangler.toml` (`pnpm setup` does this) and set `PUBLIC_WEB_ORIGIN` to your Pages URL (for CORS).
 2. `cd apps/worker && pnpm db:migrate && npx wrangler secret put GROQ_API_KEY && pnpm deploy`.
 3. Note the `*.workers.dev` URL.
 
@@ -164,7 +176,7 @@ The `functions/` directory is picked up automatically by Pages; `/r/:id` runs th
 
 `apps/worker/src/ai/prompt.ts` holds the system prompt and `PROMPT_VERSION` (stored on every record so results can be compared across iterations).
 
-- Persona: senior design lead doing a brutal but fair review. Roast the work, never the person. Explicit bans on slurs, identity comments and personal attacks.
+- Personas: `brutal` is a senior design lead doing a brutal but fair review; `comedy` is a roast-battle headliner who must still grade honestly and end every bit with a sincere fix. Both share one output contract (the JSON block is appended to both prompts from a single string, so the shape cannot drift). Roast the work, never the person. Explicit bans on slurs, identity comments and personal attacks.
 - Inputs: desktop + mobile screenshots as base64 data URLs, plus a FACTS block measured by the headless browser (title, H1, meta description, font families, image/link/word counts, load time, dark-mode toggle, template fingerprints). The prompt requires citing those numbers and forbids inventing new ones.
 - Output: strict JSON (`response_format: json_object`, temperature 0.4) validated with zod (`apps/worker/src/lib/schema.ts`). 5-7 roasts, each with severity, category, title, detail, fix and a bounding box in 0..1 fractions tagged with its viewport. 1-2 compliments. Boxes are clamped into the image after parsing; malformed output is retried once.
 - Score calibration is spelled out in the prompt (median portfolio 55, templates in the 20s, 90+ only for hire-worthy work) to counter the model's tendency to award 7x/100 to everything.
@@ -183,7 +195,7 @@ The `functions/` directory is picked up automatically by Pages; `/r/:id` runs th
 
 ## Résumé line
 
-> Built **Portfolio Roast**, a zero-cost AI design-critique tool on Cloudflare Workers (Hono, D1, KV, R2, Browser Rendering) and Pages (React, Vite, Tailwind): headless-browser screenshots and page signals feed a vision LLM with strict JSON output, producing scored, screenshot-annotated roasts, OG share cards rendered on the edge, and a public leaderboard, with SSRF guarding, per-IP and global quotas, and a mock mode for key-free local development.
+> Built **Portfolio Roast**, a zero-cost AI design-critique tool with two switchable critic personas, on Cloudflare Workers (Hono, D1, KV, R2, Browser Rendering) and Pages (React, Vite, Tailwind): headless-browser screenshots and page signals feed a vision LLM with strict JSON output, producing scored, screenshot-annotated roasts, OG share cards rendered on the edge, and a public leaderboard, with SSRF guarding, per-IP and global quotas, and a mock mode for key-free local development.
 
 ## License
 

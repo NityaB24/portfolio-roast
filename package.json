@@ -12,7 +12,8 @@
     "build": "pnpm -r run build",
     "lint": "eslint .",
     "test": "pnpm -r run test",
-    "deploy": "pnpm -r run deploy"
+    "deploy": "pnpm -r run deploy",
+    "setup": "bash scripts/setup.sh"
   },
   "devDependencies": {
     "@eslint/js": "^9.17.0",

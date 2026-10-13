@@ -103,3 +103,41 @@ describe("roastWithAI", () => {
     expect(parts.filter((p) => p.type === "image_url")).toHaveLength(2);
   });
 });
+
+describe("roast modes", () => {
+  it("defaults to brutal and rejects unknown modes", async () => {
+    const { RoastModeSchema } = await import("../src/lib/schema");
+    expect(RoastModeSchema.parse(undefined)).toBe("brutal");
+    expect(RoastModeSchema.parse("comedy")).toBe("comedy");
+    expect(RoastModeSchema.safeParse("savage").success).toBe(false);
+  });
+  it("selects a distinct persona and prompt version per mode, same output contract", async () => {
+    const { COMEDY_SYSTEM_PROMPT, SYSTEM_PROMPT, promptVersionFor, systemPromptFor } = await import("../src/ai/prompt");
+    expect(systemPromptFor("comedy")).toBe(COMEDY_SYSTEM_PROMPT);
+    expect(systemPromptFor("brutal")).toBe(SYSTEM_PROMPT);
+    expect(promptVersionFor("comedy")).not.toBe(promptVersionFor("brutal"));
+    const contract = '"roasts" must contain between 5 and 7 items.';
+    expect(SYSTEM_PROMPT).toContain(contract);
+    expect(COMEDY_SYSTEM_PROMPT).toContain(contract);
+    expect(COMEDY_SYSTEM_PROMPT).toMatch(/never the person/i);
+  });
+  it("comedy fixture is valid, deterministic and distinct from brutal", async () => {
+    const a = await roastWithAI({ url: "https://jane.example", mode: "comedy", signals, desktopDataUrl: "", mobileDataUrl: "" });
+    const b = await roastWithAI({ url: "https://jane.example", mode: "comedy", signals, desktopDataUrl: "", mobileDataUrl: "" });
+    const brutal = await roastWithAI({ url: "https://jane.example", signals, desktopDataUrl: "", mobileDataUrl: "" });
+    expect(a).toEqual(b);
+    expect(RoastResultSchema.safeParse(a).success).toBe(true);
+    expect(a.score).toBe(brutal.score);
+    expect(a.verdict).not.toBe(brutal.verdict);
+  });
+  it("sends the comedy persona and a higher temperature to Groq", async () => {
+    let captured: { temperature: number; messages: Array<{ role: string; content: unknown }> } | undefined;
+    const fetchImpl: typeof fetch = async (_url, init) => {
+      captured = JSON.parse(String(init?.body));
+      return new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify({ score: 40, verdict: "Ha.", roasts: [1, 2, 3, 4, 5].map(sampleItem), compliments: ["ok"] }) } }] }));
+    };
+    await roastWithAI({ url: "https://jane.example", mode: "comedy", signals, desktopDataUrl: "data:,", mobileDataUrl: "data:,", apiKey: "k", fetchImpl });
+    expect(captured?.temperature).toBe(0.7);
+    expect(String(captured?.messages[0]?.content)).toMatch(/comedy roast/i);
+  });
+});

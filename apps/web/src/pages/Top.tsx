@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, scoreTone, type LeaderboardEntry } from "../lib/api";
+import { stagger } from "../lib/ui";
 
 type Tab = "week" | "all" | "shame";
 const TABS: Array<{ id: Tab; label: string }> = [
@@ -27,56 +28,72 @@ export default function Top() {
   }, [tab]);
 
   return (
-    <section className="mx-auto max-w-[1400px] px-4 sm:px-8 pt-14 sm:pt-20">
-      <p className="tag text-blood mb-6">Public. Deduped by URL. Latest roast wins.</p>
-      <h1 className="display text-[14vw] sm:text-[8rem]">{tab === "shame" ? "THE WORST." : "THE BEST."}</h1>
+    <section className="mx-auto max-w-4xl px-4 pt-12 sm:px-8 sm:pt-20">
+      <p className="badge reveal bg-sunken text-fg-2">Public. Deduped by URL. Latest roast wins.</p>
+      <h1 className="display reveal mt-6 text-[clamp(3.25rem,11vw,7rem)]" style={stagger(1)}>
+        {tab === "shame" ? (
+          <>
+            The <em className="text-accent">worst.</em>
+          </>
+        ) : (
+          <>
+            The <em className="text-accent">best.</em>
+          </>
+        )}
+      </h1>
 
-      <div className="mt-10 flex gap-2 flex-wrap">
+      <div className="seg reveal mt-8" role="tablist" aria-label="Leaderboard period" style={stagger(2)}>
         {TABS.map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            onClick={() => setTab(t.id)}
-            className={"tag px-4 py-3 border transition-colors " + (tab === t.id ? "bg-bone text-ink border-bone" : "border-ink-3 text-bone-2 hover:border-bone-2")}
-          >
+          <button key={t.id} type="button" role="tab" aria-selected={tab === t.id} onClick={() => setTab(t.id)}>
             {t.label}
           </button>
         ))}
       </div>
 
-      <div className="mt-10">
-        {error && <p className="text-sev-high">{error}</p>}
+      <div className="mt-6" aria-live="polite">
+        {error && <p role="alert" className="rounded-lg bg-sev-high-bg px-4 py-3 text-sm font-medium text-sev-high">{error}</p>}
+
         {!rows && !error && (
-          <ul className="divide-y divide-ink-3">
+          <ul className="card divide-y divide-line overflow-hidden" aria-hidden="true">
             {Array.from({ length: 8 }).map((_, i) => (
-              <li key={i} className="py-5 h-20 animate-pulse">
-                <div className="h-4 w-1/3 bg-ink-3" />
+              <li key={i} className="flex h-[76px] animate-pulse items-center gap-4 px-4 sm:px-6">
+                <div className="h-3 w-6 rounded bg-sunken" />
+                <div className="h-4 w-1/3 rounded bg-sunken" />
+                <div className="ml-auto h-8 w-12 rounded bg-sunken" />
               </li>
             ))}
           </ul>
         )}
+
         {rows && rows.length === 0 && (
-          <div className="py-20">
-            <p className="display text-4xl text-bone-2">Nobody here yet.</p>
-            <Link to="/" className="inline-block mt-6 tag underline underline-offset-4 decoration-blood">
+          <div className="card px-6 py-16 text-center">
+            <p className="display text-4xl text-fg-2">Nobody here yet.</p>
+            <Link to="/" className="btn btn-primary mt-6">
               Be the first victim
             </Link>
           </div>
         )}
+
         {rows && rows.length > 0 && (
-          <ol className="divide-y divide-ink-3 border-y border-ink-3">
+          <ol className="card divide-y divide-line overflow-hidden">
             {rows.map((r, i) => {
               const tone = scoreTone(r.score);
               return (
-                <li key={r.id}>
-                  <Link to={`/r/${r.id}`} className="group grid grid-cols-[3rem_1fr_auto] sm:grid-cols-[4rem_1fr_minmax(0,2fr)_auto] gap-4 sm:gap-8 items-center py-5 hover:bg-ink-2 -mx-4 px-4 transition-colors">
-                    <span className="tag text-bone-3">{String(i + 1).padStart(2, "0")}</span>
-                    <span className="min-w-0 flex items-baseline gap-3">
-                      <span className="display text-xl sm:text-3xl truncate group-hover:text-blood transition-colors">{r.domain}</span>
-                      {r.mode === "comedy" && <span className="tag text-sev-med shrink-0 hidden sm:inline">comedy</span>}
+                <li key={r.id} className="reveal" style={stagger(Math.min(i, 10))}>
+                  <Link
+                    to={`/r/${r.id}`}
+                    className="group grid min-h-[76px] grid-cols-[2rem_minmax(0,1fr)_auto] items-center gap-3 px-4 py-4 transition-colors hover:bg-sunken focus-visible:-outline-offset-2 sm:grid-cols-[2.5rem_minmax(0,1fr)_auto_auto] sm:gap-5 sm:px-6"
+                  >
+                    <span className={"meta " + (i === 0 && tab !== "shame" ? "text-accent" : "text-fg-3")}>{String(i + 1).padStart(2, "0")}</span>
+                    <span className="min-w-0">
+                      <span className="flex items-baseline gap-2">
+                        <span className="display truncate text-2xl transition-colors group-hover:text-accent sm:text-3xl">{r.domain}</span>
+                        {r.mode === "comedy" && <span className="badge shrink-0 bg-sev-med-bg text-sev-med">comedy</span>}
+                      </span>
+                      <span className="mt-0.5 block truncate text-sm text-fg-2">{r.verdict}</span>
                     </span>
-                    <span className="hidden sm:block text-bone-2 truncate">{r.verdict}</span>
-                    <span className={"display text-4xl sm:text-5xl text-right " + tone.color} style={{ fontVariantNumeric: "tabular-nums" }}>
+                    <span className={"badge hidden sm:inline-flex " + tone.badge}>{tone.label}</span>
+                    <span className={"display text-right text-4xl sm:text-5xl " + tone.color} style={{ fontVariantNumeric: "tabular-nums" }}>
                       {r.score}
                     </span>
                   </Link>

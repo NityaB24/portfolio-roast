@@ -1,73 +1,286 @@
 @import "tailwindcss";
 
-@theme {
-  --color-ink: #0b0b0c;
-  --color-ink-2: #141416;
-  --color-ink-3: #1f1f23;
-  --color-bone: #f4f1ea;
-  --color-bone-2: #b8b4ab;
-  --color-bone-3: #6f6b63;
-  --color-blood: #ff3b3b;
-  --color-blood-2: #c91f1f;
-  --color-sev-high: #ff3b3b;
-  --color-sev-med: #ffb02e;
-  --color-sev-low: #4cc9f0;
-  --color-good: #7cff6b;
-  --font-display: "Archivo", "Helvetica Neue", Arial, sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
-}
-
+/*
+ * Design tokens. Warm monochrome with one accent; colour is reserved for
+ * meaning (severity, score). Every colour is a CSS variable so light and dark
+ * are a single swap of this block.
+ */
 :root {
+  color-scheme: light;
+  --canvas: #fbfaf8;
+  --surface: #ffffff;
+  --sunken: #f3f1ed;
+  --line: #e8e5df;
+  --line-strong: #d3cfc6;
+  --fg: #1b1a17;
+  --fg-2: #5c5952;
+  --fg-3: #767269;
+  --accent: #c0391b;
+  --accent-fg: #ffffff;
+  --sev-high: #9f2f2d;
+  --sev-high-bg: #fdebec;
+  --sev-med: #8a5a00;
+  --sev-med-bg: #fbf3db;
+  --sev-low: #1f6c9f;
+  --sev-low-bg: #e1f3fe;
+  --good: #2f6a36;
+  --good-bg: #edf3ec;
+  --hot-high: #e5484d;
+  --hot-med: #f5a524;
+  --hot-low: #3b9eff;
+  --glow: rgba(192, 57, 27, 0.07);
+}
+
+:root[data-theme="dark"] {
   color-scheme: dark;
+  --canvas: #121110;
+  --surface: #1a1918;
+  --sunken: #0d0c0b;
+  --line: #2b2926;
+  --line-strong: #3d3a35;
+  --fg: #f1eee8;
+  --fg-2: #aaa69d;
+  --fg-3: #8c887f;
+  --accent: #f2765c;
+  --accent-fg: #1a0b07;
+  --sev-high: #ff9a91;
+  --sev-high-bg: #3a1d1c;
+  --sev-med: #f2c260;
+  --sev-med-bg: #35290f;
+  --sev-low: #7cc4f2;
+  --sev-low-bg: #14293a;
+  --good: #8fd39a;
+  --good-bg: #16291a;
+  --glow: rgba(242, 118, 92, 0.09);
 }
 
-html,
-body {
-  background: var(--color-ink);
-  color: var(--color-bone);
-  font-family: var(--font-display);
-  -webkit-font-smoothing: antialiased;
+/* No-JS fallback: follow the system when the bootstrap script has not run. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    color-scheme: dark;
+    --canvas: #121110;
+    --surface: #1a1918;
+    --sunken: #0d0c0b;
+    --line: #2b2926;
+    --line-strong: #3d3a35;
+    --fg: #f1eee8;
+    --fg-2: #aaa69d;
+    --fg-3: #8c887f;
+    --accent: #f2765c;
+    --accent-fg: #1a0b07;
+    --sev-high: #ff9a91;
+    --sev-high-bg: #3a1d1c;
+    --sev-med: #f2c260;
+    --sev-med-bg: #35290f;
+    --sev-low: #7cc4f2;
+    --sev-low-bg: #14293a;
+    --good: #8fd39a;
+    --good-bg: #16291a;
+    --glow: rgba(242, 118, 92, 0.09);
+  }
 }
 
-body {
-  background-image:
-    linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
-  background-size: 48px 48px;
-  background-attachment: fixed;
+@theme inline {
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-sunken: var(--sunken);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-fg: var(--fg);
+  --color-fg-2: var(--fg-2);
+  --color-fg-3: var(--fg-3);
+  --color-accent: var(--accent);
+  --color-accent-fg: var(--accent-fg);
+  --color-sev-high: var(--sev-high);
+  --color-sev-high-bg: var(--sev-high-bg);
+  --color-sev-med: var(--sev-med);
+  --color-sev-med-bg: var(--sev-med-bg);
+  --color-sev-low: var(--sev-low);
+  --color-sev-low-bg: var(--sev-low-bg);
+  --color-good: var(--good);
+  --color-good-bg: var(--good-bg);
+  --font-sans: "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-serif: "Instrument Serif", "Iowan Old Style", Georgia, serif;
+  --font-mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-::selection {
-  background: var(--color-blood);
-  color: var(--color-ink);
+@layer base {
+  html {
+    background: var(--canvas);
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background: var(--canvas);
+    color: var(--fg);
+    font-family: var(--font-sans);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    transition: background-color 0.3s ease, color 0.3s ease;
+  }
+
+  /* A soft warm light spot behind the top of every page; fixed so it never scrolls. */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0 0 auto 0;
+    height: 70vh;
+    background: radial-gradient(60% 60% at 50% 0%, var(--glow), transparent 70%);
+    pointer-events: none;
+    z-index: -1;
+  }
+
+  ::selection {
+    background: var(--accent);
+    color: var(--accent-fg);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+    border-radius: 4px;
+  }
 }
 
-.display {
-  font-weight: 900;
-  letter-spacing: -0.045em;
-  line-height: 0.9;
+@layer components {
+  /* Editorial serif for headings and the score. */
+  .display {
+    font-family: var(--font-serif);
+    font-weight: 400;
+    letter-spacing: -0.02em;
+    line-height: 1.04;
+    text-wrap: balance;
+  }
+
+  .meta {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    line-height: 1.4;
+    letter-spacing: 0.01em;
+  }
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.2rem 0.6rem;
+    border-radius: 999px;
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    line-height: 1.3;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    min-height: 44px;
+    padding: 0 1.1rem;
+    border-radius: 10px;
+    border: 1px solid var(--line-strong);
+    background: var(--surface);
+    color: var(--fg);
+    font-size: 0.9rem;
+    font-weight: 500;
+    line-height: 1;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background-color 0.2s var(--ease-out-expo), border-color 0.2s var(--ease-out-expo), transform 0.2s var(--ease-out-expo), opacity 0.2s;
+  }
+  .btn:hover:not(:disabled) {
+    background: var(--sunken);
+    border-color: var(--fg-3);
+  }
+  .btn:active:not(:disabled) {
+    transform: scale(0.98);
+  }
+  .btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+  .btn-primary {
+    background: var(--fg);
+    color: var(--canvas);
+    border-color: var(--fg);
+  }
+  .btn-primary:hover:not(:disabled) {
+    background: var(--fg);
+    border-color: var(--fg);
+    opacity: 0.85;
+  }
+  .btn-danger {
+    color: var(--sev-high);
+    border-color: transparent;
+    background: transparent;
+  }
+  .btn-danger:hover:not(:disabled) {
+    background: var(--sev-high-bg);
+    border-color: transparent;
+  }
+
+  /* Segmented control (viewport + leaderboard tabs). */
+  .seg {
+    display: inline-flex;
+    padding: 3px;
+    gap: 2px;
+    background: var(--sunken);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    max-width: 100%;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .seg::-webkit-scrollbar {
+    display: none;
+  }
+  .seg button {
+    min-height: 38px;
+    padding: 0 0.9rem;
+    border-radius: 9px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--fg-2);
+    white-space: nowrap;
+    transition: background-color 0.2s var(--ease-out-expo), color 0.2s;
+  }
+  .seg button:hover {
+    color: var(--fg);
+  }
+  .seg button[aria-pressed="true"],
+  .seg button[aria-selected="true"] {
+    background: var(--surface);
+    color: var(--fg);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+  }
 }
 
-.tag {
-  font-family: var(--font-mono);
-  font-size: 0.7rem;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-}
-
-.marquee {
-  display: flex;
-  gap: 3rem;
-  white-space: nowrap;
-  animation: marquee 28s linear infinite;
-}
-
-@keyframes marquee {
+/* Entrance: gentle rise, staggered with --i. Content is never hidden when motion is reduced. */
+@keyframes rise {
   from {
-    transform: translateX(0);
+    opacity: 0;
+    transform: translateY(12px);
   }
   to {
-    transform: translateX(-50%);
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .reveal {
+    animation: rise 0.7s var(--ease-out-expo) both;
+    animation-delay: calc(var(--i, 0) * 70ms);
   }
 }
 
@@ -80,52 +293,90 @@ body {
   }
 }
 
+/* Screenshot annotations. Colours are fixed (not themed): they sit on arbitrary third-party pages. */
 .hotspot {
   position: absolute;
   border: 2px solid currentColor;
+  border-radius: 4px;
   cursor: pointer;
-  transition:
-    background-color 0.15s ease,
-    border-width 0.15s ease;
   background-color: color-mix(in srgb, currentColor 10%, transparent);
+  transition: background-color 0.15s ease, border-width 0.15s ease;
+}
+.hotspot[data-sev="high"] {
+  color: var(--hot-high);
+}
+.hotspot[data-sev="med"] {
+  color: var(--hot-med);
+}
+.hotspot[data-sev="low"] {
+  color: var(--hot-low);
 }
 .hotspot:hover,
 .hotspot[data-active="true"] {
   background-color: color-mix(in srgb, currentColor 24%, transparent);
   border-width: 3px;
-  animation: pulse-ring 1.2s ease-out infinite;
   z-index: 2;
+}
+.hotspot[data-active="true"] {
+  animation: pulse-ring 1.4s ease-out infinite;
 }
 .hotspot .pin {
   position: absolute;
-  top: -12px;
-  left: -12px;
-  width: 24px;
-  height: 24px;
+  top: 3px;
+  left: 3px;
+  width: 22px;
+  height: 22px;
   border-radius: 999px;
-  /* Inherits the severity colour from .hotspot; the inner span flips to ink. */
   background: currentColor;
-  font-family: var(--font-mono);
-  font-weight: 700;
-  font-size: 12px;
   display: grid;
   place-items: center;
+  font-family: var(--font-mono);
+  font-weight: 500;
+  font-size: 11px;
 }
 .hotspot .pin span {
-  color: var(--color-ink);
+  color: #14110f;
 }
 
 .strike {
-  background-image: linear-gradient(transparent 44%, var(--color-blood) 44%, var(--color-blood) 64%, transparent 64%);
+  position: relative;
+  white-space: nowrap;
+}
+.strike::after {
+  content: "";
+  position: absolute;
+  left: -2%;
+  right: -2%;
+  top: 56%;
+  height: 0.07em;
+  background: var(--accent);
+  border-radius: 2px;
+  transform-origin: left;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .strike::after {
+    animation: strike-in 0.9s 0.5s var(--ease-out-expo) both;
+  }
+}
+@keyframes strike-in {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
 }
 
 input::placeholder {
-  color: var(--color-bone-3);
+  color: var(--fg-3);
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .marquee,
-  .hotspot {
+  .hotspot,
+  .animate-pulse {
     animation: none;
+  }
+  html {
+    scroll-behavior: auto;
   }
 }

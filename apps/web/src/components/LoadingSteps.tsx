@@ -21,29 +21,35 @@ export default function LoadingSteps({ startedAt }: { startedAt: number }) {
   const current = STEPS.reduce((acc, s, i) => (elapsed >= s.at ? i : acc), 0);
 
   return (
-    <div className="mt-16 max-w-2xl" aria-live="polite">
+    <div className="card mt-6 p-6 sm:p-8" aria-live="polite">
       <ol className="space-y-5">
         {STEPS.map((s, i) => {
           const state = i < current ? "done" : i === current ? "active" : "todo";
           return (
-            <li key={s.label} className="flex items-start gap-5">
+            <li key={s.label} className="flex items-start gap-4">
               <span
                 className={
-                  "mt-1 h-3 w-3 shrink-0 " +
-                  (state === "done" ? "bg-good" : state === "active" ? "bg-blood animate-pulse" : "bg-ink-3")
+                  "mt-1 grid h-6 w-6 shrink-0 place-items-center rounded-full border transition-colors " +
+                  (state === "done" ? "border-transparent bg-good-bg text-good" : state === "active" ? "border-accent" : "border-line-strong")
                 }
-              />
-              <div>
-                <div className={"display text-2xl sm:text-4xl " + (state === "todo" ? "text-bone-3" : state === "active" ? "text-bone" : "text-bone-2 line-through decoration-good/70")}>
-                  {s.label}
-                </div>
-                {state === "active" && <p className="tag text-bone-3 mt-2">{s.quip}</p>}
+                aria-hidden="true"
+              >
+                {state === "done" && (
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M2.5 6.500l2.500 2.500 4.500-5" />
+                  </svg>
+                )}
+                {state === "active" && <span className="h-2 w-2 animate-pulse rounded-full bg-accent" />}
+              </span>
+              <div className="min-w-0">
+                <div className={"display text-2xl sm:text-3xl " + (state === "todo" ? "text-fg-3" : "text-fg")}>{s.label}</div>
+                {state === "active" && <p className="mt-1 text-sm text-fg-2">{s.quip}</p>}
               </div>
             </li>
           );
         })}
       </ol>
-      <p className="tag text-bone-3 mt-10">
+      <p className="meta mt-8 border-t border-line pt-4 text-fg-3">
         {elapsed.toFixed(0)}s elapsed{elapsed > 25 ? " · slow site or slow critic. Hang on." : ""}
       </p>
     </div>

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { SEVERITY_CLASS, type RoastItem, type Viewport } from "../lib/api";
+import type { RoastItem, Viewport } from "../lib/api";
 
 interface Props {
   src: string;
@@ -15,12 +15,12 @@ export default function Hotspots({ src, viewport, roasts, active, onSelect }: Pr
   const [failed, setFailed] = useState(false);
   return (
     <div
-      className={"relative w-full overflow-hidden bg-ink-2 border border-ink-3 " + (viewport === "mobile" ? "max-w-[390px] mx-auto" : "")}
+      className={"relative w-full overflow-hidden rounded-xl border border-line bg-sunken " + (viewport === "mobile" ? "mx-auto max-w-[390px]" : "")}
       style={{ aspectRatio: ASPECT[viewport] }}
     >
       {failed ? (
-        <div className="absolute inset-0 grid place-items-center text-center p-6">
-          <p className="tag text-bone-3">Screenshot unavailable.</p>
+        <div className="absolute inset-0 grid place-items-center p-6 text-center">
+          <p className="text-sm text-fg-3">Screenshot unavailable.</p>
         </div>
       ) : (
         <img src={src} alt={`${viewport} screenshot`} className="absolute inset-0 h-full w-full object-cover" onError={() => setFailed(true)} draggable={false} />
@@ -30,7 +30,8 @@ export default function Hotspots({ src, viewport, roasts, active, onSelect }: Pr
           <button
             key={i}
             type="button"
-            className={"hotspot " + SEVERITY_CLASS[r.severity]}
+            className="hotspot"
+            data-sev={r.severity}
             data-active={active === i}
             style={{ left: `${r.box.x * 100}%`, top: `${r.box.y * 100}%`, width: `${r.box.w * 100}%`, height: `${r.box.h * 100}%` }}
             onClick={() => onSelect(active === i ? null : i)}

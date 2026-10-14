@@ -137,11 +137,17 @@ export function domainOf(url: string): string {
 
 export const SEVERITY_LABEL: Record<Severity, string> = { high: "Critical", med: "Hurts", low: "Polish" };
 export const SEVERITY_CLASS: Record<Severity, string> = { high: "text-sev-high", med: "text-sev-med", low: "text-sev-low" };
+export const SEVERITY_BADGE: Record<Severity, string> = {
+  high: "bg-sev-high-bg text-sev-high",
+  med: "bg-sev-med-bg text-sev-med",
+  low: "bg-sev-low-bg text-sev-low",
+};
 
-export function scoreTone(score: number, blocked = false): { color: string; label: string } {
-  if (blocked) return { color: "text-bone-3", label: "Blocked" };
-  if (score >= 85) return { color: "text-good", label: "Hire-worthy" };
-  if (score >= 70) return { color: "text-sev-med", label: "Solid" };
-  if (score >= 50) return { color: "text-[#ff8a3d]", label: "Mid" };
-  return { color: "text-blood", label: "Roasted" };
+/** `color` is the text colour; `badge` is the matching soft pill (background + text). */
+export function scoreTone(score: number, blocked = false): { color: string; badge: string; label: string } {
+  if (blocked) return { color: "text-fg-3", badge: "bg-sunken text-fg-3", label: "Blocked" };
+  if (score >= 85) return { color: "text-good", badge: "bg-good-bg text-good", label: "Hire-worthy" };
+  if (score >= 70) return { color: "text-sev-low", badge: "bg-sev-low-bg text-sev-low", label: "Solid" };
+  if (score >= 50) return { color: "text-sev-med", badge: "bg-sev-med-bg text-sev-med", label: "Mid" };
+  return { color: "text-sev-high", badge: "bg-sev-high-bg text-sev-high", label: "Roasted" };
 }

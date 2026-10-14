@@ -2,8 +2,9 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import Hotspots from "../components/Hotspots";
 import ScoreCountUp from "../components/ScoreCountUp";
-import { api, ApiError, domainOf, MODE_LABEL, scoreTone, SEVERITY_CLASS, SEVERITY_LABEL, type HistoryEntry, type RoastRecord, type Viewport } from "../lib/api";
+import { api, ApiError, domainOf, MODE_LABEL, scoreTone, SEVERITY_BADGE, SEVERITY_LABEL, type HistoryEntry, type RoastRecord, type Viewport } from "../lib/api";
 import { formatCountdown, linkedInShareUrl, msUntilReroast, shareText, xShareUrl } from "../lib/share";
+import { stagger } from "../lib/ui";
 
 export default function Result() {
   const { id = "" } = useParams();
@@ -20,6 +21,8 @@ export default function Result() {
   const [now, setNow] = useState(Date.now());
   const [reroasting, setReroasting] = useState(false);
   const [removing, setRemoving] = useState(false);
+  const [confirmRemove, setConfirmRemove] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   useEffect(() => {
     if (rec && rec.id === id) return;
@@ -58,6 +61,14 @@ export default function Result() {
     [rec],
   );
 
+  useEffect(() => {
+    if (active === null) return;
+    const el = document.getElementById(`roast-${active}`);
+    if (!el) return;
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    el.scrollIntoView({ block: "nearest", behavior: reduce ? "auto" : "smooth" });
+  }, [active]);
+
   const pageUrl = typeof window !== "undefined" ? `${window.location.origin}/r/${id}` : `/r/${id}`;
   const improvement = useMemo(() => {
     // Compare like with like: only roasts in the same mode as this one.
@@ -71,10 +82,14 @@ export default function Result() {
 
   if (error) {
     return (
-      <section className="mx-auto max-w-[1400px] px-4 sm:px-8 py-32">
-        <h1 className="display text-6xl sm:text-8xl">GONE.</h1>
-        <p className="mt-6 text-bone-2">{error}</p>
-        <Link to="/" className="inline-block mt-8 tag underline underline-offset-4 decoration-blood">
+      <section className="mx-auto max-w-4xl px-4 py-24 sm:px-8 sm:py-32">
+        <h1 className="display reveal text-[clamp(3.5rem,12vw,7rem)]">
+          <em className="text-accent">Gone.</em>
+        </h1>
+        <p className="reveal mt-6 max-w-md text-fg-2" style={stagger(1)}>
+          {error}
+        </p>
+        <Link to="/" className="btn btn-primary reveal mt-8" style={stagger(2)}>
           Roast another
         </Link>
       </section>
@@ -82,8 +97,9 @@ export default function Result() {
   }
   if (!rec) {
     return (
-      <section className="mx-auto max-w-[1400px] px-4 sm:px-8 py-32">
-        <div className="display text-[20vw] sm:text-[14rem] text-ink-3 animate-pulse">00</div>
+      <section className="mx-auto max-w-6xl px-4 pt-16 sm:px-8 sm:pt-24" aria-busy="true" aria-label="Loading roast">
+        <div className="display animate-pulse text-[clamp(8rem,34vw,14rem)] leading-[0.8] text-sunken">00</div>
+        <div className="mt-10 h-5 w-2/3 max-w-md animate-pulse rounded bg-sunken" />
       </section>
     );
   }
@@ -106,101 +122,118 @@ export default function Result() {
   async function reroast() {
     if (!canReroast || reroasting) return;
     setReroasting(true);
+    setActionError(null);
     try {
       const fresh = await api.roast(rec!.normalizedUrl, rec!.mode);
       navigate(`/r/${fresh.id}`, { state: { record: fresh } });
       setRec(fresh);
       setActive(null);
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Re-roast failed.");
+      setActionError(e instanceof Error ? e.message : "Re-roast failed.");
     } finally {
       setReroasting(false);
     }
   }
 
   async function remove() {
-    if (!window.confirm("Remove this result from the leaderboard and hide this page? This cannot be undone.")) return;
     setRemoving(true);
+    setActionError(null);
     try {
       await api.remove(rec!.id);
       navigate("/");
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Removal failed.");
+      setActionError(e instanceof Error ? e.message : "Removal failed.");
       setRemoving(false);
+      setConfirmRemove(false);
     }
   }
 
   const text = shareText(domain, rec.score, rec.mode);
 
   return (
-    <article className="mx-auto max-w-[1400px] px-4 sm:px-8 pt-10 sm:pt-16">
+    <article className="mx-auto max-w-6xl px-4 pt-10 sm:px-8 sm:pt-16">
       {/* Score block */}
-      <header className="grid gap-8 lg:grid-cols-[auto_1fr] lg:items-end border-b border-ink-3 pb-10">
-        <div className="flex items-end gap-3">
-          <ScoreCountUp value={rec.score} className={"display text-[38vw] sm:text-[16rem] lg:text-[18rem] leading-[0.8] " + tone.color} />
-          <div className="pb-3 sm:pb-6">
-            <div className="display text-2xl sm:text-4xl text-bone-3">/100</div>
-            <div className={"tag mt-2 " + tone.color}>{tone.label}</div>
+      <header className="grid gap-8 border-b border-line pb-10 lg:grid-cols-[auto_1fr] lg:items-end lg:gap-14">
+        <div className="reveal flex items-end gap-3">
+          <ScoreCountUp value={rec.score} className={"display text-[clamp(8rem,34vw,15rem)] leading-[0.78] " + tone.color} />
+          <div className="pb-2 sm:pb-5">
+            <div className="display text-2xl text-fg-3 sm:text-4xl">/100</div>
+            <div className={"badge mt-2 " + tone.badge}>{tone.label}</div>
           </div>
         </div>
-        <div className="lg:pb-4">
-          <p className="tag text-bone-2 mb-4 flex flex-wrap items-center gap-x-3 gap-y-1">
-            <a href={rec.normalizedUrl} target="_blank" rel="noreferrer nofollow" className="text-bone hover:text-blood">
+        <div className="min-w-0 lg:pb-3">
+          <p className="meta reveal flex flex-wrap items-center gap-x-2.5 gap-y-1.5 text-fg-2" style={stagger(1)}>
+            <a href={rec.normalizedUrl} target="_blank" rel="noreferrer nofollow" className="break-all font-medium text-fg underline decoration-line-strong underline-offset-4 transition-colors hover:decoration-accent">
               {domain}
             </a>
-            <span>·</span>
+            <span aria-hidden="true">·</span>
             <time dateTime={rec.createdAt}>{new Date(rec.createdAt).toLocaleString()}</time>
-            <span>·</span>
-            <span className={rec.mode === "comedy" ? "text-sev-med" : "text-blood"}>{MODE_LABEL[rec.mode] ?? rec.mode}</span>
-            {rec.cached && <span className="text-bone-3">· cached</span>}
+            <span className={"badge " + (rec.mode === "comedy" ? "bg-sev-med-bg text-sev-med" : "bg-sev-high-bg text-sev-high")}>{MODE_LABEL[rec.mode] ?? rec.mode}</span>
+            {rec.cached && <span className="badge bg-sunken text-fg-3">cached</span>}
             {improvement && (
-              <span className={improvement.to > improvement.from ? "text-good" : "text-blood"}>
-                · {improvement.to > improvement.from ? "improved" : "dropped"} from {improvement.from} to {improvement.to}
+              <span className={"badge " + (improvement.to > improvement.from ? "bg-good-bg text-good" : "bg-sev-high-bg text-sev-high")}>
+                {improvement.to > improvement.from ? "improved" : "dropped"} {improvement.from} → {improvement.to}
               </span>
             )}
           </p>
-          <h1 className="display text-3xl sm:text-5xl lg:text-6xl text-bone">{rec.verdict}</h1>
-          <div className="mt-8 flex flex-wrap gap-2">
-            <Btn onClick={copyLink}>{copied ? "Copied" : "Copy link"}</Btn>
+          <h1 className="display reveal mt-4 text-[clamp(2rem,5vw,3.75rem)]" style={stagger(2)}>
+            {rec.verdict}
+          </h1>
+          <div className="reveal mt-7 flex flex-wrap items-center gap-2" style={stagger(3)}>
+            <Btn onClick={copyLink} primary>
+              {copied ? "Copied" : "Copy link"}
+            </Btn>
             <Btn href={xShareUrl(text, pageUrl)}>Share on X</Btn>
             <Btn href={linkedInShareUrl(pageUrl)}>LinkedIn</Btn>
             <Btn onClick={reroast} disabled={!canReroast || reroasting} title={canReroast ? "Roast this URL again" : "Available 24h after the last roast"}>
               {reroasting ? "Roasting…" : canReroast ? "Re-roast" : `Re-roast in ${formatCountdown(cooldown)}`}
             </Btn>
-            <Btn onClick={remove} disabled={removing} danger>
-              Remove my result
-            </Btn>
+            {confirmRemove ? (
+              <span className="flex flex-wrap items-center gap-2 rounded-xl bg-sev-high-bg px-3 py-1.5" role="group" aria-label="Confirm removal">
+                <span className="text-sm text-sev-high">Hide this page and drop it from the leaderboard?</span>
+                <button type="button" className="btn btn-danger !min-h-9 !px-3 font-semibold" onClick={remove} disabled={removing}>
+                  {removing ? "Removing…" : "Yes, remove"}
+                </button>
+                <button type="button" className="btn !min-h-9 !px-3" onClick={() => setConfirmRemove(false)} disabled={removing}>
+                  Cancel
+                </button>
+              </span>
+            ) : (
+              <Btn onClick={() => setConfirmRemove(true)} danger>
+                Remove my result
+              </Btn>
+            )}
           </div>
+          {actionError && (
+            <p role="alert" className="mt-4 rounded-lg bg-sev-high-bg px-4 py-3 text-sm font-medium text-sev-high">
+              {actionError}
+            </p>
+          )}
         </div>
       </header>
 
       {rec.blocked && (
-        <p className="mt-8 border border-blood/40 bg-blood/10 p-4 text-bone-2">
+        <p className="mt-8 rounded-xl bg-sev-high-bg p-4 text-sev-high">
           The headless browser could not load this page{rec.blockedReason ? ` (${rec.blockedReason})` : ""}. No screenshots, score 0. Fix the bot blocking and re-roast after 24h.
         </p>
       )}
 
       {/* Screenshot + roasts */}
-      <section className="mt-12 grid gap-10 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
-        <div>
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex gap-1">
+      <section className="mt-10 grid gap-8 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] lg:items-start lg:gap-10">
+        <div className="lg:sticky lg:top-24">
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <div className="seg" role="group" aria-label="Screenshot viewport">
               {(["desktop", "mobile"] as Viewport[]).map((vp) => (
-                <button
-                  key={vp}
-                  type="button"
-                  onClick={() => setViewport(vp)}
-                  className={"tag px-4 py-2 border transition-colors " + (viewport === vp ? "bg-bone text-ink border-bone" : "border-ink-3 text-bone-2 hover:border-bone-2")}
-                >
+                <button key={vp} type="button" onClick={() => setViewport(vp)} aria-pressed={viewport === vp}>
                   {vp === "desktop" ? "Desktop 1440" : "Mobile 390"}
                 </button>
               ))}
             </div>
-            <p className="tag text-bone-3 hidden sm:block">Click a box or a roast</p>
+            <p className="hidden text-sm text-fg-3 sm:block">Click a box or a roast</p>
           </div>
           {rec.blocked ? (
-            <div className="aspect-[1440/900] border border-ink-3 bg-ink-2 grid place-items-center">
-              <p className="display text-4xl text-bone-3">NO SIGNAL</p>
+            <div className="grid aspect-[1440/900] place-items-center rounded-xl border border-line bg-sunken">
+              <p className="display text-4xl text-fg-3">No signal</p>
             </div>
           ) : (
             <Hotspots src={api.shotUrl(rec.id, viewport)} viewport={viewport} roasts={rec.roasts} active={active} onSelect={select} />
@@ -212,24 +245,26 @@ export default function Result() {
           {rec.roasts.map((r, i) => {
             const isActive = active === i;
             return (
-              <li key={i}>
+              <li key={i} id={`roast-${i}`} className="reveal scroll-mt-24" style={stagger(Math.min(i, 8))}>
                 <button
                   type="button"
                   onClick={() => select(isActive ? null : i)}
-                  className={"w-full text-left border p-5 transition-colors " + (isActive ? "border-bone bg-ink-2" : "border-ink-3 hover:border-bone-3")}
+                  aria-pressed={isActive}
+                  className={
+                    "w-full rounded-xl border p-5 text-left transition-[border-color,background-color,transform] duration-200 active:scale-[0.995] " +
+                    (isActive ? "border-fg bg-surface" : "border-line bg-surface hover:border-line-strong")
+                  }
                 >
-                  <div className="flex items-center gap-3 tag">
-                    <span className={"inline-grid place-items-center h-6 w-6 rounded-full bg-current " + SEVERITY_CLASS[r.severity]}>
-                      <span className="text-ink font-bold tracking-normal">{i + 1}</span>
-                    </span>
-                    <span className={SEVERITY_CLASS[r.severity]}>{SEVERITY_LABEL[r.severity]}</span>
-                    <span className="text-bone-3">{r.category}</span>
-                    <span className="text-bone-3 ml-auto">{r.box.viewport}</span>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className={"grid h-6 w-6 place-items-center rounded-full font-mono text-xs font-medium " + SEVERITY_BADGE[r.severity]}>{i + 1}</span>
+                    <span className={"badge " + SEVERITY_BADGE[r.severity]}>{SEVERITY_LABEL[r.severity]}</span>
+                    <span className="meta text-fg-3">{r.category}</span>
+                    <span className="meta ml-auto text-fg-3">{r.box.viewport}</span>
                   </div>
-                  <h2 className="display text-xl sm:text-2xl mt-3 text-bone">{r.title}</h2>
-                  <p className="mt-2 text-bone-2 leading-relaxed">{r.detail}</p>
-                  <p className={"mt-3 pl-3 border-l-2 text-bone leading-relaxed " + (isActive ? "border-good" : "border-ink-3")}>
-                    <span className="tag text-good mr-2">Fix</span>
+                  <h2 className="display mt-3 text-2xl">{r.title}</h2>
+                  <p className="mt-2 text-pretty text-fg-2">{r.detail}</p>
+                  <p className={"mt-4 rounded-lg px-3 py-2.5 text-pretty text-fg transition-colors " + (isActive ? "bg-good-bg" : "bg-sunken")}>
+                    <span className="badge mr-2 bg-good-bg text-good">Fix</span>
                     {r.fix}
                   </p>
                 </button>
@@ -241,26 +276,28 @@ export default function Result() {
 
       {/* Compliments */}
       {rec.compliments.length > 0 && (
-        <section className="mt-20 grid gap-6 md:grid-cols-[1fr_2fr] border-t border-ink-3 pt-10">
-          <h2 className="display text-4xl sm:text-5xl text-good">
-            FINE,
+        <section className="mt-16 grid gap-6 rounded-2xl bg-good-bg p-6 sm:p-10 md:grid-cols-[1fr_2fr]">
+          <h2 className="display text-4xl text-good sm:text-5xl">
+            Fine, credit
             <br />
-            CREDIT WHERE DUE.
+            where due.
           </h2>
-          <ul className="space-y-4 text-lg text-bone-2 max-w-2xl">
+          <ul className="max-w-2xl space-y-4 text-lg text-fg">
             {rec.compliments.map((c, i) => (
-              <li key={i} className="flex gap-4">
-                <span className="text-good">+</span>
-                <span>{c}</span>
+              <li key={i} className="flex gap-3">
+                <svg className="mt-1.5 shrink-0 text-good" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M3 8.500l3.500 3.500L13 4.500" />
+                </svg>
+                <span className="text-pretty">{c}</span>
               </li>
             ))}
           </ul>
         </section>
       )}
 
-      <p className="mt-16 tag text-bone-3">
+      <p className="meta mt-14 break-all text-fg-3">
         prompt {rec.promptVersion} · id {rec.id} ·{" "}
-        <Link to="/" className="underline underline-offset-4 decoration-blood text-bone-2 hover:text-bone">
+        <Link to="/" className="text-fg-2 underline decoration-accent underline-offset-4 transition-colors hover:text-fg">
           roast another
         </Link>
       </p>
@@ -268,10 +305,8 @@ export default function Result() {
   );
 }
 
-function Btn({ children, onClick, href, disabled, danger, title }: { children: ReactNode; onClick?: () => void; href?: string; disabled?: boolean; danger?: boolean; title?: string }) {
-  const cls =
-    "tag px-4 py-3 border transition-colors disabled:opacity-40 disabled:cursor-not-allowed " +
-    (danger ? "border-blood/50 text-blood hover:bg-blood hover:text-ink" : "border-ink-3 text-bone hover:bg-bone hover:text-ink");
+function Btn({ children, onClick, href, disabled, danger, primary, title }: { children: ReactNode; onClick?: () => void; href?: string; disabled?: boolean; danger?: boolean; primary?: boolean; title?: string }) {
+  const cls = "btn " + (danger ? "btn-danger" : primary ? "btn-primary" : "");
   if (href) {
     return (
       <a href={href} target="_blank" rel="noreferrer" className={cls}>
@@ -297,11 +332,11 @@ function SignalsStrip({ signals }: { signals: NonNullable<RoastRecord["signals"]
     ["template", signals.usesCommonTemplate ? signals.templateHints[0] ?? "yes" : "no"],
   ];
   return (
-    <dl className="mt-4 grid grid-cols-3 sm:grid-cols-7 gap-px bg-ink-3 border border-ink-3">
+    <dl className="mt-4 grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-line bg-line min-[480px]:grid-cols-4">
       {cells.map(([k, v]) => (
-        <div key={k} className="bg-ink p-3">
-          <dt className="tag text-bone-3">{k}</dt>
-          <dd className="font-mono text-sm text-bone mt-1 truncate" title={v}>
+        <div key={k} className="col-span-1 bg-surface p-3 last:col-span-2">
+          <dt className="meta text-fg-3">{k}</dt>
+          <dd className="mt-1 truncate font-mono text-sm text-fg" title={v}>
             {v}
           </dd>
         </div>

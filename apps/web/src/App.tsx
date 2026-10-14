@@ -1,32 +1,52 @@
-import { Link, NavLink, Route, Routes } from "react-router-dom";
+import { useEffect } from "react";
+import { Link, NavLink, Route, Routes, useLocation } from "react-router-dom";
 import Home from "./pages/Home";
 import Result from "./pages/Result";
 import Top from "./pages/Top";
+import ThemeToggle from "./components/ThemeToggle";
 import { REPO_URL } from "./lib/api";
+import { stagger } from "./lib/ui";
+
+const navLink = ({ isActive }: { isActive: boolean }) =>
+  "rounded-lg px-2.5 sm:px-3 py-2 text-sm font-medium transition-colors " + (isActive ? "bg-sunken text-fg" : "text-fg-2 hover:text-fg");
 
 export default function App() {
+  const { pathname } = useLocation();
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [pathname]);
+
   return (
     <div className="min-h-dvh flex flex-col">
-      <header className="border-b border-ink-3">
-        <div className="mx-auto max-w-[1400px] px-4 sm:px-8 h-16 flex items-center justify-between gap-6">
-          <Link to="/" className="display text-2xl leading-none select-none">
-            PORTFOLIO<span className="text-blood">ROAST</span>
+      <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-fg focus:px-4 focus:py-2 focus:text-canvas">
+        Skip to content
+      </a>
+
+      <header className="sticky top-0 z-40 border-b border-line bg-canvas/80 backdrop-blur-md">
+        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-3 px-4 sm:px-8">
+          <Link to="/" className="flex items-center gap-2.5 select-none" aria-label="Portfolio Roast, home">
+            <img src="/favicon.svg" alt="" width="28" height="28" className="h-7 w-7" />
+            <span className="display hidden text-2xl leading-none min-[420px]:inline">
+              Portfolio <em className="text-accent">Roast</em>
+            </span>
           </Link>
-          <nav className="flex items-center gap-6 tag">
-            <NavLink to="/" end className={({ isActive }) => (isActive ? "text-blood" : "text-bone-2 hover:text-bone")}>
+          <nav className="flex items-center gap-0.5 sm:gap-1" aria-label="Main">
+            <NavLink to="/" end className={navLink}>
               Roast
             </NavLink>
-            <NavLink to="/top" className={({ isActive }) => (isActive ? "text-blood" : "text-bone-2 hover:text-bone")}>
+            <NavLink to="/top" className={navLink}>
               Leaderboard
             </NavLink>
-            <a href={REPO_URL} target="_blank" rel="noreferrer" className="hidden sm:inline text-bone-2 hover:text-bone">
+            <a href={REPO_URL} target="_blank" rel="noreferrer" className="hidden rounded-lg px-3 py-2 text-sm font-medium text-fg-2 transition-colors hover:text-fg sm:inline">
               Source
             </a>
+            <span className="mx-1 hidden h-5 w-px bg-line sm:block" aria-hidden="true" />
+            <ThemeToggle />
           </nav>
         </div>
       </header>
 
-      <main className="flex-1">
+      <main id="main" className="flex-1">
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/r/:id" element={<Result />} />
@@ -35,12 +55,10 @@ export default function App() {
         </Routes>
       </main>
 
-      <footer className="border-t border-ink-3 mt-24">
-        <div className="mx-auto max-w-[1400px] px-4 sm:px-8 py-8 flex flex-col sm:flex-row gap-3 sm:items-center justify-between tag text-bone-3">
-          <p>
-            Runs on Cloudflare Workers, D1, KV, R2, Browser Rendering and Groq. Free tiers only. Costs the owner $0.
-          </p>
-          <a href={REPO_URL} target="_blank" rel="noreferrer" className="hover:text-bone">
+      <footer className="mt-24 border-t border-line">
+        <div className="mx-auto flex max-w-6xl flex-col gap-3 px-4 py-8 text-sm text-fg-3 sm:flex-row sm:items-center sm:justify-between sm:px-8">
+          <p className="max-w-xl text-pretty">Runs on Cloudflare Workers, D1, KV, R2, Browser Rendering and Groq. Free tiers only. Costs the owner $0.</p>
+          <a href={REPO_URL} target="_blank" rel="noreferrer" className="meta text-fg-2 transition-colors hover:text-fg">
             github.com/NityaB24/portfolio-roast
           </a>
         </div>
@@ -51,11 +69,15 @@ export default function App() {
 
 function NotFound() {
   return (
-    <section className="mx-auto max-w-[1400px] px-4 sm:px-8 py-32">
-      <p className="tag text-blood mb-6">404</p>
-      <h1 className="display text-[14vw] sm:text-[8rem]">LOST.</h1>
-      <p className="mt-6 text-bone-2 max-w-md">This page does not exist. Unlike your portfolio's hierarchy problems, which very much do.</p>
-      <Link to="/" className="inline-block mt-8 tag text-bone underline underline-offset-4 decoration-blood">
+    <section className="mx-auto max-w-6xl px-4 py-24 sm:px-8 sm:py-32">
+      <p className="badge bg-sunken text-fg-2 reveal">404</p>
+      <h1 className="display reveal mt-6 text-[clamp(3.5rem,12vw,8rem)]" style={stagger(1)}>
+        Lost, <em className="text-accent">somehow.</em>
+      </h1>
+      <p className="reveal mt-6 max-w-md text-fg-2" style={stagger(2)}>
+        This page does not exist. Unlike your portfolio's hierarchy problems, which very much do.
+      </p>
+      <Link to="/" className="btn btn-primary reveal mt-8" style={stagger(3)}>
         Back to the grill
       </Link>
     </section>
